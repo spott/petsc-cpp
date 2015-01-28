@@ -5,7 +5,7 @@
 #include <array>
 #include <mutex>
 
-#include<petsc_cpp/Petsc.hpp>
+#include <petsc_cpp/Petsc.hpp>
 
 namespace petsc
 {

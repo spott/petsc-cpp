@@ -81,7 +81,7 @@ class EigenvalueSolver
     // Getters:
     MPI_Comm comm() const;
 
-  Matrix op() const;
+    Matrix op() const;
     // can't controll the order of the destruction of static objects...
     // so this object can't be static, because it won't be destroyed till
     // it is

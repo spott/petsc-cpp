@@ -7,9 +7,14 @@
 #
 # To enable this hook, rename this file to "pre-commit".
 
+exec 1>&2
+echo "make format..."
 make format
+format_value=$?
+echo "make syntax_check..."
 make syntax_check
-return $?
+syntax_value=$?
+exit $((syntax_value + format_value))
 
 # if git rev-parse --verify HEAD >/dev/null 2>&1
 # then

@@ -1,5 +1,6 @@
 #include ../makefile.include
 
+
 PETSC_DIR=/usr/local/Cellar/petsc/3.5.2-debug
 SLEPC_DIR=/usr/local/Cellar/slepc/3.5.1-debug
 
@@ -22,7 +23,7 @@ ${EXECUTABLE}: ${OBJECTS}  chkopts
 	-${CLINKER} -o ${EXECUTABLE} ${OBJECTS} ${LDFLAGS} ${PETSC_VEC_LIB} ${SLEPC_LIB}
 
 syntax_check: chkopts
-	-${CLINKER} -fsyntax-only ${SOURCES} ${PETSC_VEC_LIB} ${SLEPC_LIB}
+	-${CLINKER} -fsyntax-only ${SOURCES} -I${SLEPC_DIR}/include/ -I./include/ -std=c++1y -I${PETSC_DIR}/include/
 
 format:
 	clang-format -style=file -i ${SOURCES}

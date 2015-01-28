@@ -35,7 +35,8 @@ class PetscContext
     PetscContext( const int argc,
                   const char** argv,
                   std::string filename,
-                  std::string help ) : comm_(PETSC_COMM_WORLD)
+                  std::string help )
+        : comm_( PETSC_COMM_WORLD )
     {
         int ac = argc;
         char** av = new char* [argc];
@@ -50,7 +51,8 @@ class PetscContext
 #endif
     }
 
-    PetscContext( const int argc, const char** argv ) : comm_(PETSC_COMM_WORLD)
+    PetscContext( const int argc, const char** argv )
+        : comm_( PETSC_COMM_WORLD )
     {
         int ac = argc;
         char** av = new char* [argc];
@@ -65,13 +67,15 @@ class PetscContext
 #endif
     }
 
-  int rank() const {
-    static int rank = [=]() {
-      int r;
-        MPI_Comm_rank(this->comm_, &r);
-      return r;}();
-    return rank;
-  }
+    int rank() const
+    {
+        static int rank = [=]() {
+            int r;
+            MPI_Comm_rank( this->comm_, &r );
+            return r;
+        }();
+        return rank;
+    }
 
     ~PetscContext()
     {
@@ -82,7 +86,7 @@ class PetscContext
 #endif
     }
 
-private:
-  MPI_Comm comm_;
+  private:
+    MPI_Comm comm_;
 };
 }
