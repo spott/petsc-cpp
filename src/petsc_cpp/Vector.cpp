@@ -16,7 +16,7 @@ void swap( Vector& first, Vector& second ) // nothrow
 *************/
 
 // set value:
-  void Vector::set_value( const int n, PetscScalar v )
+void Vector::set_value( const int n, PetscScalar v )
 {
     l.lock();
     VecSetValue( v_, n, v, INSERT_VALUES );
@@ -37,7 +37,7 @@ void Vector::assemble()
 /*************
 // calculations:
 *************/
-double Vector::norm( NormType nt) const
+double Vector::norm( NormType nt ) const
 {
     double norm;
     VecNorm( v_, nt, &norm );

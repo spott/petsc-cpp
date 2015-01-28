@@ -73,7 +73,8 @@ EigenvalueSolver::result EigenvalueSolver::get_eigenpair( int nev )
 }
 
 
-EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::operator=( Iterator rhs )
+EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::
+operator=( Iterator rhs )
 {
     *this = EigenvalueSolver::Iterator( rhs.nev, rhs.e );
     return *this;
@@ -96,7 +97,8 @@ bool EigenvalueSolver::Iterator::operator!=( const Iterator& rhs )
 {
     return ( rhs.nev != nev || ( &( rhs.e ) != &( e ) ) );
 }
-  EigenvalueSolver::Iterator::value_type EigenvalueSolver::Iterator::operator*()
+EigenvalueSolver::Iterator::value_type EigenvalueSolver::Iterator::
+operator*()
 {
     return e.get_eigenpair( nev );
 }
