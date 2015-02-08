@@ -117,6 +117,13 @@ Vector Matrix::get_left_vector() const
     return Vector{a};
 }
 
+double Matrix::norm( NormType t )
+{
+    double norm;
+    MatNorm( m_, t, &norm );
+    return norm;
+}
+
 Vector Matrix::operator*( const Vector& v ) const
 {
     Vector out = this->get_left_vector();

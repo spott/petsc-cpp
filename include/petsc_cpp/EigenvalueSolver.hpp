@@ -32,27 +32,26 @@ class EigenvalueSolver
     // EPSSolve(e_);
     //}
 
-    EigenvalueSolver( const MPI_Comm& comm,
-                      Matrix& A,
+    EigenvalueSolver( Matrix& A,
+                      Matrix* space,
                       int dim,
                       EPSWhich which_pair = EPS_SMALLEST_REAL,
                       EPSProblemType type = EPS_HEP )
-        : op_( A )
+        : op_( A ), inner_product_space( space )
     {
         assert( type == EPS_HEP ||
                 type == EPS_NHEP ); // we only want hermitian
                                     // or non-hermitian
                                     // values
-        EPSCreate( comm, &e_ );
+        EPSCreate( A.comm(), &e_ );
         EPSSetOperators( e_, A.m_, PETSC_NULL );
         EPSSetProblemType( e_, type );
         EPSSetDimensions( e_, dim, PETSC_DECIDE, PETSC_DECIDE );
         EPSSetWhichEigenpairs( e_, which_pair );
         EPSSetFromOptions( e_ );
-        EPSSolve( e_ );
     }
     EigenvalueSolver( Matrix& A, int dim = 1 )
-        : EigenvalueSolver( A.comm(), A, dim, EPS_SMALLEST_REAL, EPS_HEP )
+        : EigenvalueSolver( A, nullptr, dim, EPS_SMALLEST_REAL, EPS_HEP )
     {
     }
 
@@ -61,17 +60,13 @@ class EigenvalueSolver
         delete; // we don't need no stinkin copy constructor...
 
     EigenvalueSolver( EigenvalueSolver&& other )
-        : e_( other.e_ ), op_( other.op_ )
+        : e_( other.e_ ), op_( other.op_ ),
+          inner_product_space( other.inner_product_space )
     {
         other.e_ = PETSC_NULL;
+        other.inner_product_space = nullptr;
         // other.op_ = nullptr;
     }
-
-    // EigenvalueSolver& operator=( EigenvalueSolver&& other )
-    // {
-    //     swap( *this, other );
-    //     return *this;
-    // }
 
     friend void swap( EigenvalueSolver& first,
                       EigenvalueSolver& second ); // nothrow
@@ -82,16 +77,22 @@ class EigenvalueSolver
     MPI_Comm comm() const;
 
     Matrix op() const;
-    // can't controll the order of the destruction of static objects...
-    // so this object can't be static, because it won't be destroyed till
-    // it is
-    // too late.
+
+    void set_inner_product_space( Matrix B );
+    void solve();
+    void set_initial_vector( Vector init );
+    void
+    balance( EPSBalance bal, int iter, double cuttoff = PETSC_DECIDE );
+    void shift_invert( std::complex<double> sigma );
+
+    void dimensions( int nev, int mpd = -1, int ncv = -1 );
 
     int iteration_number() const;
 
     std::array<int, 3> dimensions() const;
 
     std::tuple<PetscReal, PetscInt> tolerances() const;
+    void tolerances( double tol, int iterations );
 
     int num_converged() const;
 
@@ -103,19 +104,22 @@ class EigenvalueSolver
 
     // print!:
     void print() const;
+    void save_basis( const std::string& filename ) const;
+    void save_basis( const std::string& filename,
+                     std::function<void(Vector&)> modification ) const;
 
     // This version spits out a new vector:
-    EigenvalueSolver::result get_eigenpair( int nev );
+    EigenvalueSolver::result get_eigenpair( int nev ) const;
+    PetscScalar get_eigenvalue( int nev ) const;
 
-    class Iterator : public std::iterator<std::forward_iterator_tag,
-                                          EigenvalueSolver::result,
-                                          int>
+    class Iterator : public std::iterator<std::random_access_iterator_tag,
+                                          EigenvalueSolver::result>
     {
       public:
         int nev;
-        EigenvalueSolver& e;
+        const EigenvalueSolver& e;
 
-        explicit Iterator( const int i, EigenvalueSolver& es )
+        explicit Iterator( const int i, const EigenvalueSolver& es )
             : nev( i ), e( es )
         {
         }
@@ -128,37 +132,36 @@ class EigenvalueSolver
 
         Iterator& operator++();
         Iterator operator++( int );
+        Iterator& operator+=( Iterator::difference_type diff );
+        Iterator& operator--();
+        Iterator operator--( int );
+        Iterator& operator-=( Iterator::difference_type diff );
 
-        // iterator& operator+=(iterator::Distance diff) {
-        // nev+=diff;
-        // return *this;
-        //}
-        // iterator& operator--() {
-        // nev--;
-        // return *this;
-        //}
-        // iterator& operator--(int) {
-        // auto ret = *this;
-        // nev--;
-        // return ret;
-        //}
+        Iterator::difference_type operator-( const Iterator& other );
+        Iterator operator-( int n );
+        Iterator operator+( int n );
 
-        // iterator& operator-=(iterator::Distance diff) {
-        // nev-=diff;
-        // return *this;
-        //}
+        Iterator::value_type operator[]( int n );
 
+        bool operator>( const Iterator& rhs );
+        bool operator<( const Iterator& rhs );
+        bool operator>=( const Iterator& rhs );
+        bool operator<=( const Iterator& rhs );
 
         bool operator!=( const Iterator& rhs );
-
         Iterator::value_type operator*();
+        std::unique_ptr<EigenvalueSolver::Iterator::value_type>
+        operator->();
     };
 
-    EigenvalueSolver::Iterator begin();
+    EigenvalueSolver::Iterator begin() const;
+    EigenvalueSolver::result front();
 
-    EigenvalueSolver::Iterator end();
+    EigenvalueSolver::Iterator end() const;
+    EigenvalueSolver::result back();
 
     EPS e_;
     Matrix& op_;
+    Matrix* inner_product_space;
 };
 }

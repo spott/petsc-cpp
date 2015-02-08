@@ -36,45 +36,46 @@ class PetscContext
                   const char** argv,
                   std::string filename,
                   std::string help )
-        : comm_( PETSC_COMM_WORLD )
     {
         int ac = argc;
-        char** av = new char* [argc];
+        char** av = new char* [argc + 1];
         for ( int i = 0; i < argc; i++ ) {
             av[i] = new char[strlen( argv[i] ) + 1];
             std::copy( argv[i], argv[i] + strlen( argv[i] ) + 1, av[i] );
         }
+        av[ac] = NULL;
 #ifdef SLEPC
         SlepcInitialize( &ac, &av, filename.c_str(), help.c_str() );
 #else
         PetscInitialize( &ac, &av, filename.c_str(), help.c_str() );
 #endif
+        comm_ = PETSC_COMM_WORLD;
     }
 
     PetscContext( const int argc, const char** argv )
-        : comm_( PETSC_COMM_WORLD )
     {
         int ac = argc;
-        char** av = new char* [argc];
+        char** av = new char* [argc + 1];
         for ( int i = 0; i < argc; i++ ) {
             av[i] = new char[strlen( argv[i] ) + 1];
             std::copy( argv[i], argv[i] + strlen( argv[i] ) + 1, av[i] );
         }
+        av[ac] = NULL;
 #ifdef SLEPC
         SlepcInitialize( &ac, &av, PETSC_NULL, PETSC_NULL );
 #else
         PetscInitialize( &ac, &av, PETSC_NULL, PETSC_NULL );
 #endif
+        comm_ = PETSC_COMM_WORLD;
     }
+
+    MPI_Comm comm() const { return comm_; }
 
     int rank() const
     {
-        static int rank = [=]() {
-            int r;
-            MPI_Comm_rank( this->comm_, &r );
-            return r;
-        }();
-        return rank;
+        int r;
+        MPI_Comm_rank( this->comm_, &r );
+        return r;
     }
 
     ~PetscContext()
@@ -86,7 +87,7 @@ class PetscContext
 #endif
     }
 
-  private:
+    // private:
     MPI_Comm comm_;
 };
 }

@@ -1,7 +1,9 @@
 #define SLEPC
 
+#include <stdexcept>
 #include <petsc_cpp/Petsc.hpp>
 #include <petsc_cpp/EigenvalueSolver.hpp>
+#include <util.hpp>
 
 
 namespace petsc
@@ -29,6 +31,42 @@ MPI_Comm EigenvalueSolver::comm() const
 
 Matrix EigenvalueSolver::op() const { return op_; }
 
+void EigenvalueSolver::set_inner_product_space( Matrix B )
+{
+    BV bv;
+    EPSGetBV( e_, &bv );
+    BVSetMatrix( bv, B.m_, PETSC_FALSE );
+}
+void EigenvalueSolver::solve() { EPSSolve( e_ ); }
+
+void EigenvalueSolver::set_initial_vector( Vector init )
+{
+    EPSSetInitialSpace( e_, 1, &init.v_ );
+}
+
+void EigenvalueSolver::balance( EPSBalance bal, int iter, double cutoff )
+{
+    EPSSetBalance( e_, bal, iter, cutoff );
+}
+
+void EigenvalueSolver::shift_invert( std::complex<double> sigma )
+{
+    ST st;
+    EPSGetST( e_, &st );
+    STSetShift( st, sigma );
+    STSetType( st, STSINVERT );
+}
+
+void EigenvalueSolver::dimensions( int nev, int mpd, int ncv )
+{
+    auto val = dimensions();
+    if ( mpd == -1 ) mpd = PETSC_DECIDE;
+    if ( ncv == -1 ) ncv = PETSC_DECIDE;
+    if ( nev == -1 ) nev = val[0];
+
+    EPSSetDimensions( e_, nev, ncv, mpd );
+}
+
 int EigenvalueSolver::iteration_number() const
 {
     int its;
@@ -51,6 +89,11 @@ std::tuple<PetscReal, PetscInt> EigenvalueSolver::tolerances() const
     return std::tie( tol, its );
 }
 
+void EigenvalueSolver::tolerances( double tol, int its )
+{
+    EPSSetTolerances( e_, tol, its );
+}
+
 int EigenvalueSolver::num_converged() const
 {
     int nconv;
@@ -63,13 +106,93 @@ void EigenvalueSolver::print() const
     EPSView( e_, PETSC_VIEWER_STDOUT_WORLD );
 }
 
-
-EigenvalueSolver::result EigenvalueSolver::get_eigenpair( int nev )
+void EigenvalueSolver::save_basis( const std::string& filename ) const
 {
+    if ( num_converged() < 1 ) return;
+
+    VecScatter scatter;
+    Vec local;
+    const PetscScalar* array;
+    PetscInt start, end;
+
+    Vector a = op().get_right_vector();
+    std::vector<std::complex<double>> temp;
+
+    VecScatterCreateToZero( a.v_, &scatter, &local );
+
+    for ( auto a : *this ) {
+        VecScatterBegin( scatter, a.evector.v_, local, INSERT_VALUES,
+                         SCATTER_FORWARD );
+        VecScatterEnd( scatter, a.evector.v_, local, INSERT_VALUES,
+                       SCATTER_FORWARD );
+
+        VecGetOwnershipRange( local, &start, &end );
+        VecGetArrayRead( local, &array );
+
+        for ( int i = start; i < end; ++i ) {
+            temp.push_back( array[i] );
+        }
+
+        VecRestoreArrayRead( local, &array );
+        util::export_vector_binary( filename, temp, true );
+        temp.clear();
+    }
+}
+void EigenvalueSolver::save_basis(
+    const std::string& filename,
+    std::function<void(Vector&)> modification ) const
+{
+    if ( num_converged() < 1 ) return;
+
+    VecScatter scatter;
+    Vec local;
+    const PetscScalar* array;
+    PetscInt start, end;
+
+    Vector a = op().get_right_vector();
+    std::vector<std::complex<double>> temp;
+
+    VecScatterCreateToZero( a.v_, &scatter, &local );
+
+    for ( auto a : *this ) {
+        modification( a.evector );
+        VecScatterBegin( scatter, a.evector.v_, local, INSERT_VALUES,
+                         SCATTER_FORWARD );
+        VecScatterEnd( scatter, a.evector.v_, local, INSERT_VALUES,
+                       SCATTER_FORWARD );
+
+        VecGetOwnershipRange( local, &start, &end );
+        VecGetArrayRead( local, &array );
+
+        for ( int i = start; i < end; ++i ) {
+            temp.push_back( array[i] );
+        }
+
+        VecRestoreArrayRead( local, &array );
+        util::export_vector_binary( filename, temp, true );
+        temp.clear();
+    }
+}
+
+
+EigenvalueSolver::result EigenvalueSolver::get_eigenpair( int nev ) const
+{
+    assert( nev < num_converged() );
     auto v = op().get_right_vector();
     PetscScalar ev;
     EPSGetEigenpair( e_, nev, &ev, PETSC_NULL, v.v_, PETSC_NULL );
+    v.normalize_sign();
+    if ( inner_product_space != nullptr )
+        v /= std::sqrt( inner_product( v, *inner_product_space, v ) );
     return result{nev, ev, v};
+}
+
+PetscScalar EigenvalueSolver::get_eigenvalue( int nev ) const
+{
+    assert( nev < num_converged() );
+    PetscScalar ev;
+    EPSGetEigenvalue( e_, nev, &ev, PETSC_NULL );
+    return ev;
 }
 
 
@@ -82,33 +205,140 @@ operator=( Iterator rhs )
 
 EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::operator++()
 {
+    // assert( nev < e.num_converged()-1 );
     nev++;
     return *this;
 }
 
 EigenvalueSolver::Iterator EigenvalueSolver::Iterator::operator++( int )
 {
+    // assert( nev < e.num_converged()-1 );
     auto ret = *this;
     nev++;
     return ret;
 }
 
-bool EigenvalueSolver::Iterator::operator!=( const Iterator& rhs )
+EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::
+operator+=( EigenvalueSolver::Iterator::difference_type diff )
 {
-    return ( rhs.nev != nev || ( &( rhs.e ) != &( e ) ) );
+
+    // assert( nev + diff < e.num_converged() && nev + diff >= 0 );
+    nev += diff;
+    return *this;
 }
-EigenvalueSolver::Iterator::value_type EigenvalueSolver::Iterator::
-operator*()
+
+EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::operator--()
 {
+    // assert( nev > 0 );
+    nev--;
+    return *this;
+}
+EigenvalueSolver::Iterator EigenvalueSolver::Iterator::operator--( int )
+{
+    // assert( nev > 0 );
+    auto ret = *this;
+    nev--;
+    return ret;
+}
+
+EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::
+operator-=( EigenvalueSolver::Iterator::difference_type diff )
+{
+    // assert( nev - diff < e.num_converged() && nev - diff >= 0 );
+    nev -= diff;
+    return *this;
+}
+
+EigenvalueSolver::Iterator::difference_type EigenvalueSolver::Iterator::
+operator-( const EigenvalueSolver::Iterator& other )
+{
+    return nev - other.nev;
+}
+
+EigenvalueSolver::Iterator EigenvalueSolver::Iterator::operator-( int n )
+{
+    EigenvalueSolver::Iterator ret{*this};
+    ret -= n;
+    return ret;
+}
+EigenvalueSolver::Iterator EigenvalueSolver::Iterator::operator+( int n )
+{
+    EigenvalueSolver::Iterator ret{*this};
+    ret += n;
+    return ret;
+}
+
+EigenvalueSolver::Iterator::value_type EigenvalueSolver::Iterator::
+operator[]( int n )
+{
+    // assert( n < e.num_converged() && n >= 0 );
+    nev = n;
     return e.get_eigenpair( nev );
 }
 
-EigenvalueSolver::Iterator EigenvalueSolver::begin()
+bool EigenvalueSolver::Iterator::
+operator!=( const EigenvalueSolver::Iterator& rhs )
+{
+    return ( rhs.nev != nev || ( &( rhs.e ) != &( e ) ) );
+}
+
+bool EigenvalueSolver::Iterator::
+operator>( const EigenvalueSolver::Iterator& rhs )
+{
+    return nev > rhs.nev;
+}
+bool EigenvalueSolver::Iterator::
+operator<( const EigenvalueSolver::Iterator& rhs )
+{
+    return nev < rhs.nev;
+}
+bool EigenvalueSolver::Iterator::
+operator>=( const EigenvalueSolver::Iterator& rhs )
+{
+    return nev >= rhs.nev;
+}
+bool EigenvalueSolver::Iterator::
+operator<=( const EigenvalueSolver::Iterator& rhs )
+{
+    return nev <= rhs.nev;
+}
+
+EigenvalueSolver::Iterator::value_type EigenvalueSolver::Iterator::
+operator*()
+{
+    if ( nev < 0 || nev >= e.num_converged() )
+        throw std::out_of_range( "EigenvalueSolver::Iterator: attempting "
+                                 "to dereference an iterator that is out "
+                                 "of "
+                                 "range" );
+    return e.get_eigenpair( nev );
+}
+std::unique_ptr<EigenvalueSolver::Iterator::value_type>
+    EigenvalueSolver::Iterator::operator->()
+{
+    if ( nev < 0 || nev >= e.num_converged() )
+        throw std::out_of_range( "EigenvalueSolver::Iterator: attempting "
+                                 "to dereference an iterator "
+                                 "that is out of range" );
+    return std::make_unique<EigenvalueSolver::result>(
+        e.get_eigenpair( nev ) );
+}
+
+EigenvalueSolver::Iterator EigenvalueSolver::begin() const
 {
     return EigenvalueSolver::Iterator( 0, *this );
 }
-EigenvalueSolver::Iterator EigenvalueSolver::end()
+EigenvalueSolver::Iterator EigenvalueSolver::end() const
 {
-    return EigenvalueSolver::Iterator( num_converged() - 1, *this );
+    return EigenvalueSolver::Iterator( num_converged(), *this );
+}
+
+EigenvalueSolver::result EigenvalueSolver::front()
+{
+    return get_eigenpair( 0 );
+}
+EigenvalueSolver::result EigenvalueSolver::back()
+{
+    return get_eigenpair( num_converged() - 1 );
 }
 }

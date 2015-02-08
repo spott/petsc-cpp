@@ -4,6 +4,7 @@
 #include <iostream>
 #include <array>
 #include <mutex>
+#include <vector>
 
 #include <petsc_cpp/Petsc.hpp>
 
@@ -18,7 +19,7 @@ class Vector
         VecCreate( comm, &v_ );
     }
 
-    Vector( int size = 10,
+    Vector( int size,
             const VecType t = VECSTANDARD,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : has_type( true ), assembled( false )
@@ -72,19 +73,29 @@ class Vector
     // calculations:
     *************/
     double norm( NormType nt = NORM_2 ) const;
-
     double normalize();
+    std::complex<double> normalize_sign();
+
+    Vector operator-( Vector other ) const;
+    Vector operator+( Vector other ) const;
+    Vector operator*( const PetscScalar& other ) const;
+    Vector operator/( const PetscScalar& other ) const;
+    Vector& operator*=( const PetscScalar& other );
+    Vector& operator/=( const PetscScalar& other );
 
     /*************
     //getters:
     *************/
     MPI_Comm comm() const;
+    int rank() const;
 
     size_t size() const;
 
     std::array<int, 2> get_ownership_rows() const;
 
+    Vector duplicate() const;
     void print() const;
+    void draw( const std::vector<double>* v = nullptr ) const;
 
     void to_file( const std::string& filename ) const;
 
@@ -98,6 +109,8 @@ class Vector
     // yet;
     Vec v_;
 
+    // TODO:  make iterator for vector?
+
   private:
     // state:
     bool has_type;
@@ -106,4 +119,6 @@ class Vector
 
     friend class Matrix;
 };
+
+Vector operator*( const PetscScalar& alpha, Vector b );
 }

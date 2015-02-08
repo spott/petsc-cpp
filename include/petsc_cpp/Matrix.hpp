@@ -21,7 +21,7 @@ class Matrix
         MatCreate( comm, &m_ );
     }
 
-    Matrix( const MatType t = MATMPIAIJ,
+    Matrix( const MatType t /*= MATMPIAIJ*/,
             const MPI_Comm comm = PETSC_COMM_WORLD )
     {
         MatCreate( comm, &m_ );
@@ -29,29 +29,44 @@ class Matrix
         has_type = true;
     }
 
+    // Matrix( unsigned int N,
+    //         unsigned int M,
+    //         MatMult_t F,
+    //         const MPI_Comm comm = PETSC_COMM_WORLD )
+    // {
+    //     int m, n;
+    //     Vec y, x;
+    //     VecCreateMPI( comm, PETSC_DECIDE, M, &y );
+    //     VecCreateMPI( comm, PETSC_DECIDE, N, &x );
+    //     VecGetLocalSize( y, &m );
+    //     VecGetLocalSize( x, &n );
+    //     MatCreateShell( comm, m, n, M, N, ctx, &m_ );
+    //     MatShellSetOperation( m_, MATOP_MULT, (void (*)( void ))F );
+    // }
+
     // symmetric:
-    Matrix( unsigned int n,
-            const MatType t = MATMPIAIJ,
+    Matrix( unsigned int N,
+            const MatType t = MATAIJ,
             const MPI_Comm comm = PETSC_COMM_WORLD )
     {
         MatCreate( comm, &m_ );
         MatSetType( m_, t );
         has_type = true;
-        MatSetSizes( m_, PETSC_DECIDE, PETSC_DECIDE, static_cast<int>( n ),
-                     static_cast<int>( n ) );
+        MatSetSizes( m_, PETSC_DECIDE, PETSC_DECIDE, static_cast<int>( N ),
+                     static_cast<int>( N ) );
     }
 
     // non-symmetric:
-    Matrix( unsigned int n,
-            unsigned int m,
+    Matrix( unsigned int N,
+            unsigned int M,
             const MatType t = MATMPIAIJ,
             const MPI_Comm comm = PETSC_COMM_WORLD )
     {
         MatCreate( comm, &m_ );
         MatSetType( m_, t );
         has_type = true;
-        MatSetSizes( m_, PETSC_DECIDE, PETSC_DECIDE, static_cast<int>( n ),
-                     static_cast<int>( m ) );
+        MatSetSizes( m_, PETSC_DECIDE, PETSC_DECIDE, static_cast<int>( N ),
+                     static_cast<int>( M ) );
     }
 
     // assume that the matrix actually has a type... this should only be
@@ -142,6 +157,8 @@ class Matrix
     Vector get_right_vector() const;
 
     Vector get_left_vector() const;
+
+    double norm( NormType t = NORM_FROBENIUS );
 
     Vector operator*( const Vector& v ) const;
 

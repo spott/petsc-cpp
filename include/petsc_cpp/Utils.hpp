@@ -129,5 +129,5 @@ map<Vector>( Vector& v, std::function<PetscScalar(PetscScalar, int)> f )
 PetscScalar inner_product( const Vector& l, const Vector& r );
 
 PetscScalar
-inner_product( const Vector& l, const Vector& r, const Matrix& m );
+inner_product( const Vector& l, const Matrix& m, const Vector& r );
 }
