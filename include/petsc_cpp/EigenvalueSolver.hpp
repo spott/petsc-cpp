@@ -10,48 +10,64 @@
 namespace petsc
 {
 
-// enum class ProblemType { Hermitian, GeneralizedHermitian, NonHermitian,
-// GeneralizedNonHermitian, PositiveGeneralizedNonHermitian,
-// GeneralizedHermitianIndefinite };
-// template<enum PT>
-// We are only going to look at non-generalized solvers initially, later we
-// will
-// template this with the above enum.
 class EigenvalueSolver
 {
   public:
-    // EigenvalueSolver(const MPI_Comm& comm, Matrix& A, Matrix& B, int
-    // dim,
-    // EPSProblemType type, EPSWhich which_pair) {
-    // EPSCreate(comm, &e_);
-    // EPSSetOperators(e_, A.m_, B.m_);
-    // EPSSetProblemType(e_, type);
-    // EPSSetDimensions(e_, dim, PETSC_DECIDE , PETSC_DECIDE);
-    // EPSSetWhichEigenpairs(e_, which_pair);
-    // EPSSetFromOptions(e_);
-    // EPSSolve(e_);
-    //}
+    enum class Type {
+        hermitian = EPS_HEP,
+        nonhermitian = EPS_NHEP,
+        gen_hermitian = EPS_GHEP,
+        gen_nonhermitian = EPS_GNHEP,
+        pos_gen_nonhermitian = EPS_PGNHEP,
+        indef_gen_nonhermitian = EPS_GHIEP
+    };
+    enum class Which {
+        largest_mag = EPS_LARGEST_MAGNITUDE,
+        smallest_mag = EPS_SMALLEST_MAGNITUDE,
+        largest_real = EPS_LARGEST_REAL,
+        smallest_real = EPS_SMALLEST_REAL,
+        largest_imaginary = EPS_LARGEST_IMAGINARY,
+        smallest_imaginary = EPS_SMALLEST_IMAGINARY,
+        target_mag = EPS_TARGET_MAGNITUDE,
+        target_real = EPS_TARGET_REAL,
+        target_imag = EPS_TARGET_IMAGINARY,
+        all = EPS_ALL,
+        user = EPS_WHICH_USER
+    };
 
     EigenvalueSolver( Matrix& A,
-                      Matrix* space,
+                      Matrix& space,
                       int dim,
-                      EPSWhich which_pair = EPS_SMALLEST_REAL,
-                      EPSProblemType type = EPS_HEP )
-        : op_( A ), inner_product_space( space )
+                      Which which = Which::smallest_real,
+                      Type type = Type::hermitian )
+        : op_( A ), inner_product_space( &space )
     {
-        assert( type == EPS_HEP ||
-                type == EPS_NHEP ); // we only want hermitian
-                                    // or non-hermitian
-                                    // values
+        assert( type == Type::hermitian || type == Type::nonhermitian );
         EPSCreate( A.comm(), &e_ );
         EPSSetOperators( e_, A.m_, PETSC_NULL );
-        EPSSetProblemType( e_, type );
+        EPSSetProblemType( e_, static_cast<EPSProblemType>( type ) );
         EPSSetDimensions( e_, dim, PETSC_DECIDE, PETSC_DECIDE );
-        EPSSetWhichEigenpairs( e_, which_pair );
-        EPSSetFromOptions( e_ );
+        EPSSetWhichEigenpairs( e_, static_cast<EPSWhich>( which ) );
+        EPSSetUp(e_);
     }
-    EigenvalueSolver( Matrix& A, int dim = 1 )
-        : EigenvalueSolver( A, nullptr, dim, EPS_SMALLEST_REAL, EPS_HEP )
+    EigenvalueSolver( Matrix& A,
+                      int dim,
+                      Which which = Which::smallest_real,
+                      Type type = Type::hermitian )
+        : op_( A ), inner_product_space( nullptr )
+    {
+        assert( type == Type::hermitian || type == Type::nonhermitian );
+        EPSCreate( A.comm(), &e_ );
+        EPSSetOperators( e_, A.m_, PETSC_NULL );
+        EPSSetProblemType( e_, static_cast<EPSProblemType>( type ) );
+        EPSSetDimensions( e_, dim, PETSC_DECIDE, PETSC_DECIDE );
+        EPSSetWhichEigenpairs( e_, static_cast<EPSWhich>( which ) );
+        EPSSetUp(e_);
+    }
+  
+    EigenvalueSolver( Matrix& A)
+        : EigenvalueSolver(
+              A, 1, Which::smallest_real, Type::hermitian )
     {
     }
 
