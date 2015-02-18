@@ -37,9 +37,10 @@ void EigenvalueSolver::set_inner_product_space( Matrix B )
     EPSGetBV( e_, &bv );
     BVSetMatrix( bv, B.m_, PETSC_FALSE );
 }
-void EigenvalueSolver::solve() {
-  EPSSetFromOptions( e_ );
-  EPSSolve( e_ );
+void EigenvalueSolver::solve()
+{
+    EPSSetFromOptions( e_ );
+    EPSSolve( e_ );
 }
 
 void EigenvalueSolver::set_initial_vector( Vector init )

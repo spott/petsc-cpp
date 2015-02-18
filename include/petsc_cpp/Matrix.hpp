@@ -147,6 +147,7 @@ class Matrix
 
     // getters:
     MPI_Comm comm() const;
+    int rank() const;
 
     std::array<int, 2> n() const;
 

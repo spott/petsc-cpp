@@ -48,7 +48,7 @@ class EigenvalueSolver
         EPSSetProblemType( e_, static_cast<EPSProblemType>( type ) );
         EPSSetDimensions( e_, dim, PETSC_DECIDE, PETSC_DECIDE );
         EPSSetWhichEigenpairs( e_, static_cast<EPSWhich>( which ) );
-        EPSSetUp(e_);
+        EPSSetUp( e_ );
     }
     EigenvalueSolver( Matrix& A,
                       int dim,
@@ -62,12 +62,11 @@ class EigenvalueSolver
         EPSSetProblemType( e_, static_cast<EPSProblemType>( type ) );
         EPSSetDimensions( e_, dim, PETSC_DECIDE, PETSC_DECIDE );
         EPSSetWhichEigenpairs( e_, static_cast<EPSWhich>( which ) );
-        EPSSetUp(e_);
+        EPSSetUp( e_ );
     }
-  
-    EigenvalueSolver( Matrix& A)
-        : EigenvalueSolver(
-              A, 1, Which::smallest_real, Type::hermitian )
+
+    EigenvalueSolver( Matrix& A )
+        : EigenvalueSolver( A, 1, Which::smallest_real, Type::hermitian )
     {
     }
 

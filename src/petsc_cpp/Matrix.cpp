@@ -76,6 +76,18 @@ MPI_Comm Matrix::comm() const
     return comm;
 }
 
+int Matrix::rank() const
+{
+    static int rank = [=]() {
+        MPI_Comm c;
+        int rank;
+        PetscObjectGetComm( (PetscObject)m_, &c );
+        MPI_Comm_rank( c, &rank );
+        return rank;
+    }();
+    return rank;
+}
+
 std::array<int, 2> Matrix::n() const
 {
     static std::array<int, 2> n = [=]() {
