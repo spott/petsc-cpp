@@ -5,7 +5,7 @@ SLEPC_DIR=/usr/local/Cellar/slepc/3.5.3-debug
 #include ${PETSC_DIR}/conf/rules
 include ${SLEPC_DIR}/conf/slepc_common
 
-CPP_FLAGS=-I/Users/spott/Code/include/ -I/Users/spott/code/c++/util/include/ -I. -std=c++1y
+CPP_FLAGS=-I/Users/spott/Code/include/ -I/Users/spott/code/c++/util/include/ -I. -std=c++1y -Wall -Wpedantic -Werror
 LDFLAGS=
 
 SOURCES=src/petsc_cpp/Matrix.cpp src/petsc_cpp/Vector.cpp src/petsc_cpp/EigenvalueSolver.cpp src/petsc_cpp/Utils.cpp test.cpp
@@ -16,6 +16,7 @@ LIB=lib/libpetsc_cpp.a
 DEFAULT=all
 
 all: $(EXECUTABLE) library
+	echo "It compiles!  You should commit!"
 
 ${EXECUTABLE}: ${OBJECTS}  chkopts
 	-${CLINKER} -o ${EXECUTABLE} ${OBJECTS} ${LDFLAGS} ${PETSC_VEC_LIB} ${SLEPC_LIB}
@@ -24,7 +25,7 @@ library:${OBJECTS}
 	ar rus ${LIB} ${OBJECTS}
 
 syntax_check: chkopts
-	-${CLINKER} -fsyntax-only ${SOURCES} ${CPP_FLAGS} -I${SLEPC_DIR}/include/ -I${PETSC_DIR}/include/
+	clang++ -fsyntax-only ${SOURCES} ${CPP_FLAGS} -I${SLEPC_DIR}/include/ -I${PETSC_DIR}/include/
 
 format:
 	clang-format -style=file -i ${SOURCES}
