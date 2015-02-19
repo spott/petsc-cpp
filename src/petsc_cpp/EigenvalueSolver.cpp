@@ -29,7 +29,7 @@ MPI_Comm EigenvalueSolver::comm() const
 }
 
 
-Matrix EigenvalueSolver::op() const { return op_; }
+Matrix& EigenvalueSolver::op() const { return op_; }
 
 void EigenvalueSolver::set_inner_product_space( Matrix B )
 {

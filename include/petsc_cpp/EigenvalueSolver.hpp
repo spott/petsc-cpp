@@ -91,7 +91,7 @@ class EigenvalueSolver
     // Getters:
     MPI_Comm comm() const;
 
-    Matrix op() const;
+    Matrix& op() const;
 
     void set_inner_product_space( Matrix B );
     void solve();
