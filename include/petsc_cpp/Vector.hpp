@@ -70,6 +70,7 @@ class Vector
     // assemble:
     void assemble();
 
+    Vector& conjugate();
 
     /*************
     // calculations:
@@ -123,4 +124,5 @@ class Vector
 };
 
 Vector operator*( const PetscScalar& alpha, Vector b );
+Vector conjugate( Vector v );
 }

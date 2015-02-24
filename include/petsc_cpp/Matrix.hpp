@@ -151,6 +151,8 @@ class Matrix
     MPI_Comm comm() const;
     int rank() const;
 
+    Matrix& transpose();
+    Matrix& hermitian_transpose();
     std::array<int, 2> n() const;
 
     std::array<int, 2> get_ownership_rows() const;
@@ -182,4 +184,8 @@ class Matrix
 
     friend class Vector;
 };
+
+// return matrices that act as "transposes" of the given matrix
+Matrix transpose( const Matrix& A );
+Matrix hermitian_transpose( const Matrix& A );
 }

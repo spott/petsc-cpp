@@ -15,8 +15,7 @@ int main( int argc, const char** argv )
     MPI_Comm_rank( m.comm(), &rank );
 
     m.reserve( []( int i, int j ) {
-        return i == j || i == j + 1 || i == j + 2 || i == j - 1 ||
-               i == j - 2;
+        return i == j || i == j + 1 || i == j + 2 || i == j - 1 || i == j - 2;
     } );
     populate_matrix( m, []( int i, int j ) {
                             return i == j || i == j + 1 || i == j + 2 ||
@@ -53,6 +52,7 @@ int main( int argc, const char** argv )
     vecs[1] = m * vecs[0];
     vecs[1].print();
 
+    m.hermitian_transpose();
 // if (rank == 0) std::cout << "Eigentest!" << std::endl;
 #ifdef SLEPC
     EigenvalueSolver e( m, 10 );

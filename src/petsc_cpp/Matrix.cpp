@@ -1,6 +1,10 @@
 #include <petsc_cpp/Petsc.hpp>
 #include <petsc_cpp/Matrix.hpp>
 
+extern "C" {
+#include <petsc_cpp/HermitianTranspose.h>
+}
+
 namespace petsc
 {
 // assignment operator:
@@ -88,6 +92,30 @@ int Matrix::rank() const
     return rank;
 }
 
+Matrix& Matrix::transpose()
+{
+    static Mat old_mat = m_;
+    if ( old_mat == m_ )
+        MatCreateTranspose( old_mat, &m_ );
+    else {
+        MatDestroy( &m_ );
+        m_ = old_mat;
+    }
+    return *this;
+}
+
+Matrix& Matrix::hermitian_transpose()
+{
+    static Mat old_mat = m_;
+    if ( old_mat == m_ )
+        MatCreateHTranspose( old_mat, &m_ );
+    else {
+        MatDestroy( &m_ );
+        m_ = old_mat;
+    }
+    return *this;
+}
+
 std::array<int, 2> Matrix::n() const
 {
     static std::array<int, 2> n = [=]() {
@@ -153,5 +181,20 @@ void Matrix::to_file( const std::string& filename ) const
                            &view );
     MatView( m_, view );
     PetscViewerDestroy( &view );
+}
+
+Matrix transpose( const Matrix& A )
+{
+    Mat m;
+    MatCreateTranspose( A.m_, &m );
+    return Matrix{m};
+}
+
+Matrix hermitian_transpose( const Matrix& A )
+{
+    // argh, waste cycles by doing a deep version.
+    Mat m;
+    MatHermitianTranspose( A.m_, MAT_INITIAL_MATRIX, &m );
+    return Matrix{m};
 }
 }

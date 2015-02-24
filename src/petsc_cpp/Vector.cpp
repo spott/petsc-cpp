@@ -1,6 +1,7 @@
 #include <petsc_cpp/Petsc.hpp>
 #include <petsc_cpp/Vector.hpp>
-#include <util.hpp>
+#include <petsc_cpp/Utils.hpp>
+//#include <util.hpp>
 
 namespace petsc
 {
@@ -36,6 +37,11 @@ void Vector::assemble()
     l.unlock();
 }
 
+Vector& Vector::conjugate()
+{
+    VecConjugate( v_ );
+    return *this;
+}
 /*************
 // calculations:
 *************/
@@ -73,24 +79,21 @@ std::complex<double> Vector::normalize_sign()
 Vector Vector::operator-( Vector other ) const
 {
     if ( this->rank() == 0 )
-        std::cerr << "using operator-: this is inefficient!!!"
-                  << std::endl;
+        std::cerr << "using operator-: this is inefficient!!!" << std::endl;
     VecAYPX( other.v_, -1.0, this->v_ );
     return other;
 }
 Vector Vector::operator+( Vector other ) const
 {
     if ( this->rank() == 0 )
-        std::cerr << "using operator+: this is inefficient!!!"
-                  << std::endl;
+        std::cerr << "using operator+: this is inefficient!!!" << std::endl;
     VecAYPX( other.v_, 1.0, this->v_ );
     return other;
 }
 Vector Vector::operator*( const PetscScalar& other ) const
 {
     if ( this->rank() == 0 )
-        std::cerr << "using operator*: this is inefficient!!!"
-                  << std::endl;
+        std::cerr << "using operator*: this is inefficient!!!" << std::endl;
     Vector v{*this};
     VecScale( v.v_, other );
     return v;
@@ -109,8 +112,7 @@ Vector& Vector::operator*=( const PetscScalar& other )
 Vector Vector::operator/( const PetscScalar& other ) const
 {
     if ( this->rank() == 0 )
-        std::cerr << "using operator-: this is inefficient!!!"
-                  << std::endl;
+        std::cerr << "using operator-: this is inefficient!!!" << std::endl;
     Vector v{*this};
     VecScale( v.v_, 1. / other );
     return v;
@@ -172,7 +174,7 @@ void Vector::print() const { VecView( v_, PETSC_VIEWER_STDOUT_WORLD ); }
 void Vector::draw( const std::vector<double>* v ) const
 {
     VecView( v_, PETSC_VIEWER_DRAW_WORLD );
-    util::wait_for_key();
+    // util::wait_for_key();
     Vector imag{*this};
     map( imag, []( PetscScalar a, int b ) { return a.imag(); } );
     VecView( imag.v_, PETSC_VIEWER_DRAW_WORLD );
@@ -232,9 +234,14 @@ void Vector::to_file( const std::string& filename ) const
 Vector operator*( const PetscScalar& alpha, Vector b )
 {
     if ( b.rank() == 0 )
-        std::cerr << "using operator*: this is inefficient!!!"
-                  << std::endl;
+        std::cerr << "using operator*: this is inefficient!!!" << std::endl;
     VecScale( b.v_, alpha );
     return b;
+}
+
+Vector conjugate( Vector v )
+{
+    VecConjugate( v.v_ );
+    return v;
 }
 }
