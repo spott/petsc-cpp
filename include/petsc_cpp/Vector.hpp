@@ -41,7 +41,9 @@ class Vector
     }
 
     // move constructor:
-    Vector( Vector&& other ) : v_( other.v_ ), has_type( other.has_type )
+    Vector( Vector&& other )
+        : v_( other.v_ ), has_type( other.has_type ),
+          assembled( other.assembled )
     {
         other.v_ = PETSC_NULL;
     }

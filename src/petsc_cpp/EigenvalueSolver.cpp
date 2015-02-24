@@ -3,7 +3,6 @@
 #include <stdexcept>
 #include <petsc_cpp/Petsc.hpp>
 #include <petsc_cpp/EigenvalueSolver.hpp>
-#include <util.hpp>
 
 
 namespace petsc
@@ -15,6 +14,10 @@ void swap( EigenvalueSolver& first, EigenvalueSolver& second ) // nothrow
 
     swap( first.e_, second.e_ );
     swap( first.op_, second.op_ );
+    swap( first.problem_type, second.problem_type );
+    swap( first.which, second.which );
+    swap( first.inner_product_space_mat, second.inner_product_space_mat );
+    swap( first.inner_product_space_diag, second.inner_product_space_diag );
 }
 
 
@@ -30,16 +33,36 @@ MPI_Comm EigenvalueSolver::comm() const
 
 
 Matrix& EigenvalueSolver::op() const { return op_; }
-
-void EigenvalueSolver::set_inner_product_space( Matrix B )
+Matrix& EigenvalueSolver::op( Matrix& A )
 {
-    BV bv;
-    EPSGetBV( e_, &bv );
-    BVSetMatrix( bv, B.m_, PETSC_FALSE );
+    EPSSetOperators( e_, A.m_, NULL );
+    // EPSSetProblemType( e_, static_cast<EPSProblemType>( problem_type ) );
+    // EPSSetWhichEigenpairs( e_, static_cast<EPSWhich>( which ) );
+    // EPSSetUp(e_);
+    assert( &A == &op_ );
+    return op_;
+}
+
+void EigenvalueSolver::inner_product_space( Matrix&& B )
+{
+    using namespace std;
+    assert( inner_product_space_diag == nullptr );
+    inner_product_space_mat = make_unique<Matrix>( move( B ) );
+}
+void EigenvalueSolver::inner_product_space( Vector&& B )
+{
+    using namespace std;
+    assert( inner_product_space_mat == nullptr );
+    inner_product_space_diag = make_unique<Vector>( move( B ) );
 }
 void EigenvalueSolver::solve()
 {
-    EPSSetFromOptions( e_ );
+    static bool set_from_options = false;
+    if ( !set_from_options ) {
+        EPSSetFromOptions( e_ );
+        set_from_options = true;
+    }
+
     EPSSolve( e_ );
 }
 
@@ -142,9 +165,9 @@ void EigenvalueSolver::save_basis( const std::string& filename ) const
         temp.clear();
     }
 }
-void EigenvalueSolver::save_basis(
-    const std::string& filename,
-    std::function<void(Vector&)> modification ) const
+void
+EigenvalueSolver::save_basis( const std::string& filename,
+                              std::function<void(Vector&)> modification ) const
 {
     if ( num_converged() < 1 ) return;
 
@@ -186,8 +209,10 @@ EigenvalueSolver::result EigenvalueSolver::get_eigenpair( int nev ) const
     PetscScalar ev;
     EPSGetEigenpair( e_, nev, &ev, PETSC_NULL, v.v_, PETSC_NULL );
     v.normalize_sign();
-    if ( inner_product_space != nullptr )
-        v /= std::sqrt( inner_product( v, *inner_product_space, v ) );
+    if ( inner_product_space_mat != nullptr )
+        v /= std::sqrt( inner_product( v, *inner_product_space_mat, v ) );
+    else if ( inner_product_space_diag != nullptr )
+        v /= std::sqrt( inner_product( v, *inner_product_space_diag, v ) );
     return result{nev, ev, v};
 }
 
@@ -307,8 +332,7 @@ operator<=( const EigenvalueSolver::Iterator& rhs )
     return nev <= rhs.nev;
 }
 
-EigenvalueSolver::Iterator::value_type EigenvalueSolver::Iterator::
-operator*()
+EigenvalueSolver::Iterator::value_type EigenvalueSolver::Iterator::operator*()
 {
     if ( nev < 0 || nev >= e.num_converged() )
         throw std::out_of_range( "EigenvalueSolver::Iterator: attempting "
@@ -324,8 +348,7 @@ std::unique_ptr<EigenvalueSolver::Iterator::value_type>
         throw std::out_of_range( "EigenvalueSolver::Iterator: attempting "
                                  "to dereference an iterator "
                                  "that is out of range" );
-    return std::make_unique<EigenvalueSolver::result>(
-        e.get_eigenpair( nev ) );
+    return std::make_unique<EigenvalueSolver::result>( e.get_eigenpair( nev ) );
 }
 
 EigenvalueSolver::Iterator EigenvalueSolver::begin() const

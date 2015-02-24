@@ -40,7 +40,9 @@ class EigenvalueSolver
                       int dim,
                       Which which = Which::smallest_real,
                       Type type = Type::hermitian )
-        : op_( A ), inner_product_space( &space )
+        : op_( A ), inner_product_space_mat( &space ),
+          inner_product_space_diag( nullptr ), problem_type( type ),
+          which( which )
     {
         assert( type == Type::hermitian || type == Type::nonhermitian );
         EPSCreate( A.comm(), &e_ );
@@ -54,7 +56,9 @@ class EigenvalueSolver
                       int dim,
                       Which which = Which::smallest_real,
                       Type type = Type::hermitian )
-        : op_( A ), inner_product_space( nullptr )
+        : op_( A ), inner_product_space_mat( nullptr ),
+          inner_product_space_diag( nullptr ), problem_type( type ),
+          which( which )
     {
         assert( type == Type::hermitian || type == Type::nonhermitian );
         EPSCreate( A.comm(), &e_ );
@@ -75,11 +79,14 @@ class EigenvalueSolver
         delete; // we don't need no stinkin copy constructor...
 
     EigenvalueSolver( EigenvalueSolver&& other )
-        : e_( other.e_ ), op_( other.op_ ),
-          inner_product_space( other.inner_product_space )
+        : e_( other.e_ ), op_( other.op_ ), problem_type( other.problem_type ),
+          which( other.which )
     {
+        inner_product_space_mat = std::move( other.inner_product_space_mat );
+        inner_product_space_diag = std::move( other.inner_product_space_diag );
         other.e_ = PETSC_NULL;
-        other.inner_product_space = nullptr;
+        other.inner_product_space_mat = nullptr;
+        other.inner_product_space_diag = nullptr;
         // other.op_ = nullptr;
     }
 
@@ -92,12 +99,13 @@ class EigenvalueSolver
     MPI_Comm comm() const;
 
     Matrix& op() const;
+    Matrix& op( Matrix& op );
 
-    void set_inner_product_space( Matrix B );
+    void inner_product_space( Matrix&& B );
+    void inner_product_space( Vector&& B );
     void solve();
     void set_initial_vector( Vector init );
-    void
-    balance( EPSBalance bal, int iter, double cuttoff = PETSC_DECIDE );
+    void balance( EPSBalance bal, int iter, double cuttoff = PETSC_DECIDE );
     void shift_invert( std::complex<double> sigma );
 
     void dimensions( int nev, int mpd = -1, int ncv = -1 );
@@ -165,8 +173,7 @@ class EigenvalueSolver
 
         bool operator!=( const Iterator& rhs );
         Iterator::value_type operator*();
-        std::unique_ptr<EigenvalueSolver::Iterator::value_type>
-        operator->();
+        std::unique_ptr<EigenvalueSolver::Iterator::value_type> operator->();
     };
 
     EigenvalueSolver::Iterator begin() const;
@@ -177,6 +184,9 @@ class EigenvalueSolver
 
     EPS e_;
     Matrix& op_;
-    Matrix* inner_product_space;
+    std::unique_ptr<Matrix> inner_product_space_mat;
+    std::unique_ptr<Vector> inner_product_space_diag;
+    Type problem_type;
+    Which which;
 };
 }

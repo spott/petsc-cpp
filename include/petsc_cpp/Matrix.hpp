@@ -44,7 +44,7 @@ class Matrix
     //     MatShellSetOperation( m_, MATOP_MULT, (void (*)( void ))F );
     // }
 
-    // symmetric:
+    // square:
     Matrix( unsigned int N,
             const MatType t = MATAIJ,
             const MPI_Comm comm = PETSC_COMM_WORLD )
@@ -56,7 +56,7 @@ class Matrix
                      static_cast<int>( N ) );
     }
 
-    // non-symmetric:
+    // non-square:
     Matrix( unsigned int N,
             unsigned int M,
             const MatType t = MATMPIAIJ,
@@ -72,7 +72,7 @@ class Matrix
     // assume that the matrix actually has a type... this should only be
     // used in the implementation, but might be used if I forgot a
     // function:
-    Matrix( Mat& in ) : m_( in ), has_type( true ), assembled( true ) {}
+    Matrix( Mat in ) : m_( in ), has_type( true ), assembled( true ) {}
 
     // rule of 4.5:
     Matrix( const Matrix& other )
@@ -80,7 +80,9 @@ class Matrix
         MatConvert( other.m_, MATSAME, MAT_INITIAL_MATRIX, &m_ );
     }
 
-    Matrix( Matrix&& other ) : m_( other.m_ ), has_type( other.has_type )
+    Matrix( Matrix&& other )
+        : m_( other.m_ ), has_type( other.has_type ),
+          assembled( other.assembled )
     {
         other.m_ = PETSC_NULL;
     }

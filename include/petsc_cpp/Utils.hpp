@@ -1,5 +1,11 @@
 #pragma once
 
+// c stdlib
+#include <unistd.h>
+
+// stl
+#include <fstream>
+#include <cstdarg>
 #include <memory>
 #include <iostream>
 #include <array>
@@ -8,11 +14,10 @@
 namespace petsc
 {
 
-inline void
-populate_matrix( Matrix& m_,
-                 std::function<bool(int, int)> test,
-                 std::function<PetscScalar(int, int)> find_value,
-                 bool symmetric = true )
+inline void populate_matrix( Matrix& m_,
+                             std::function<bool(int, int)> test,
+                             std::function<PetscScalar(int, int)> find_value,
+                             bool symmetric = true )
 {
     // Local objects:
     PetscInt rowstart, rowend;
@@ -54,31 +59,26 @@ template <typename T>
 inline void binary_import( T&, const std::string& );
 
 template <>
-inline void binary_import<Matrix>( Matrix& m_,
-                                   const std::string& filename )
+inline void binary_import<Matrix>( Matrix& m_, const std::string& filename )
 {
     PetscViewer view;
-    PetscViewerBinaryOpen( m_.comm(), filename.c_str(), FILE_MODE_READ,
-                           &view );
+    PetscViewerBinaryOpen( m_.comm(), filename.c_str(), FILE_MODE_READ, &view );
     MatLoad( m_.m_, view );
     PetscViewerDestroy( &view );
 }
 
 template <>
-inline void binary_import<Vector>( Vector& m_,
-                                   const std::string& filename )
+inline void binary_import<Vector>( Vector& m_, const std::string& filename )
 {
     PetscViewer view;
-    PetscViewerBinaryOpen( m_.comm(), filename.c_str(), FILE_MODE_READ,
-                           &view );
+    PetscViewerBinaryOpen( m_.comm(), filename.c_str(), FILE_MODE_READ, &view );
     VecLoad( m_.v_, view );
     PetscViewerDestroy( &view );
 }
 
 
 template <typename T>
-inline T&
-map( const T&, std::function<PetscScalar(PetscScalar, int)>, T& );
+inline T& map( const T&, std::function<PetscScalar(PetscScalar, int)>, T& );
 
 template <>
 inline Vector& map<Vector>( const Vector& v_,
@@ -110,8 +110,8 @@ template <typename T>
 inline T& map( T&, std::function<PetscScalar(PetscScalar, int)> );
 
 template <>
-inline Vector&
-map<Vector>( Vector& v, std::function<PetscScalar(PetscScalar, int)> f )
+inline Vector& map<Vector>( Vector& v,
+                            std::function<PetscScalar(PetscScalar, int)> f )
 {
     int vstart, vend;
     PetscScalar* a;
@@ -128,6 +128,125 @@ map<Vector>( Vector& v, std::function<PetscScalar(PetscScalar, int)> f )
 
 PetscScalar inner_product( const Vector& l, const Vector& r );
 
-PetscScalar
-inner_product( const Vector& l, const Matrix& m, const Vector& r );
+PetscScalar inner_product( const Vector& l, const Matrix& m, const Vector& r );
+
+// for diagonal vectors:
+PetscScalar inner_product( const Vector& l, const Vector& m, const Vector& r );
+}
+
+
+namespace util
+{
+
+inline void wait_for_key()
+{
+    std::cout << std::endl << "Press ENTER to continue..." << std::endl;
+    std::cin.clear();
+    std::cin.ignore( std::cin.rdbuf()->in_avail() );
+    std::cin.get();
+}
+
+
+inline void printProgBar( double percent, std::ostream& os = std::cout )
+{
+    percent *= 100;
+    std::string bar;
+
+    for ( int i = 0; i < 50; i++ ) {
+        if ( i < ( percent / 2 ) ) {
+            bar.replace( i, 1, "=" );
+        } else if ( i == ( int( percent ) / 2 ) ) {
+            bar.replace( i, 1, ">" );
+        } else {
+            bar.replace( i, 1, " " );
+        }
+    }
+
+    os << "\r"
+          "[" << bar << "] ";
+    os.width( 3 );
+    os << percent << "%     " << std::flush;
+}
+
+
+inline std::string absolute_path( const std::string& rel_path )
+{
+    if ( rel_path[0] == '.' ) {
+        char* a = new char[1025];
+        getcwd( a, 1025 );
+        std::string cwd = std::string( a );
+        delete a;
+        return cwd.append( "/" ).append( rel_path );
+    } else
+        return rel_path;
+}
+
+
+inline bool file_exists( const std::string& fname )
+{
+    bool ret;
+    std::ifstream f( fname );
+    if ( f.good() )
+        ret = true;
+    else
+        ret = false;
+    f.close();
+
+    return ret;
+}
+
+template <typename T, typename U>
+inline void export_vector_binary( const std::string& filename,
+                                  const std::vector<T>& out,
+                                  const std::vector<U>& prefix )
+{
+    std::ios::pos_type size;
+    std::ofstream file;
+    file.open( filename.c_str(), std::ios::binary | std::ios::out );
+    if ( file.is_open() ) {
+        if ( prefix.size() > 0 )
+            file.write( reinterpret_cast<const char*>( prefix.data() ),
+                        static_cast<size_t>( sizeof( U ) * prefix.size() ) );
+        file.write( reinterpret_cast<const char*>( &out[0] ),
+                    static_cast<size_t>( sizeof( T ) * out.size() ) );
+        file.close();
+    } else {
+        std::cerr << "error opening file... does the folder exist?: "
+                  << filename << std::endl;
+        throw new std::exception();
+    }
+}
+
+template <typename T, typename T2 = T, size_t block_size = 100>
+inline void export_vector_binary( const std::string& filename,
+                                  const std::vector<T>& out,
+                                  bool append = false )
+{
+    std::ios::pos_type size;
+    std::ofstream file;
+    auto openmode = std::ios::binary | std::ios::out;
+    if ( append ) openmode = openmode | std::ios::app;
+    file.open( filename.c_str(), openmode );
+    if ( file.is_open() ) {
+        for ( auto i = out.begin(); i < out.end(); i += block_size ) {
+            std::array<T2, block_size> ni;
+            for ( auto j = i; j < ( ( out.end() - i < int( block_size ) )
+                                        ? out.end()
+                                        : i + block_size );
+                  j++ )
+                ni[j - i] = static_cast<T2>( *j );
+            file.write(
+                reinterpret_cast<const char*>( &ni ),
+                static_cast<size_t>( sizeof( T2 ) *
+                                     ( ( out.end() - i < int( block_size ) )
+                                           ? out.end() - i
+                                           : block_size ) ) );
+        }
+        file.close();
+    } else {
+        std::cerr << "error opening file... does the folder exist?: "
+                  << filename << std::endl;
+        throw new std::exception();
+    }
+}
 }
