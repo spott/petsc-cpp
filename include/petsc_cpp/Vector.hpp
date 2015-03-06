@@ -12,6 +12,40 @@ namespace petsc
 {
 class Vector
 {
+
+  public:
+    enum class type {
+        seq,
+        mpi,
+        standard
+        //#define VECSEQ         "seq"
+        //#define VECMPI         "mpi"
+        //#define VECSTANDARD    "standard"
+    };
+
+  private:
+    static VecType to_VecType( type t )
+    {
+        switch ( t ) {
+            case type::seq:
+                return VECSEQ;
+            case type::mpi:
+                return VECMPI;
+            case type::standard:
+                return VECSTANDARD;
+        }
+    }
+
+    static type to_type( VecType t )
+    {
+        if ( t == VECSEQ ) return type::seq;
+        if ( t == VECMPI ) return type::mpi;
+        if ( t == VECSTANDARD ) return type::standard;
+        throw std::out_of_range( std::string( "type not supported " ) +
+                                 static_cast<const char*>( t ) );
+    }
+
+
   public:
     Vector( const MPI_Comm comm = PETSC_COMM_WORLD )
         : has_type( false ), assembled( false )
@@ -20,12 +54,12 @@ class Vector
     }
 
     Vector( int size,
-            const VecType t = VECSTANDARD,
+            const type t = type::standard,
             const MPI_Comm comm = PETSC_COMM_WORLD )
-        : has_type( true ), assembled( false )
+        : has_type( true ), assembled( false ), vec_type( t )
     {
         VecCreate( comm, &v_ );
-        VecSetType( v_, t );
+        VecSetType( v_, to_VecType( t ) );
         VecSetSizes( v_, PETSC_DECIDE, size );
     }
 
@@ -34,7 +68,8 @@ class Vector
     //rule of 4.5:
     *************/
     // copy constructor:
-    Vector( const Vector& other ) : has_type( other.has_type )
+    Vector( const Vector& other )
+        : has_type( other.has_type ), vec_type( other.vec_type )
     {
         VecDuplicate( other.v_, &v_ );
         VecCopy( other.v_, v_ );
@@ -43,9 +78,24 @@ class Vector
     // move constructor:
     Vector( Vector&& other )
         : v_( other.v_ ), has_type( other.has_type ),
-          assembled( other.assembled )
+          assembled( other.assembled ), vec_type( other.vec_type ), l()
     {
         other.v_ = PETSC_NULL;
+    }
+
+    // assume that the vector actually has a type... this should only be
+    // used in
+    // the implementation, but might be used if
+    // I forgot a function;
+    Vector( Vec& in ) : v_( in ), assembled( true )
+    {
+        VecType t;
+        VecGetType( v_, &t );
+        if ( t ) {
+            vec_type = to_type( t );
+            has_type = true;
+        } else
+            has_type = false;
     }
 
     // assignment operator:
@@ -102,11 +152,6 @@ class Vector
 
     void to_file( const std::string& filename ) const;
 
-    // assume that the vector actually has a type... this should only be
-    // used in
-    // the implementation, but might be used if
-    // I forgot a function;
-    Vector( Vec& in ) : v_( in ), has_type( true ), assembled( true ) {}
 
     // this is public incase people want to use methods that aren't defined
     // yet;
@@ -118,6 +163,7 @@ class Vector
     // state:
     bool has_type;
     bool assembled;
+    type vec_type;
     std::mutex l;
 
     friend class Matrix;

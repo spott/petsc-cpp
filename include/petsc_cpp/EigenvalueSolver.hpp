@@ -127,9 +127,11 @@ class EigenvalueSolver
 
     // print!:
     void print() const;
-    void save_basis( const std::string& filename ) const;
+
+    template <typename Scalar>
     void save_basis( const std::string& filename,
-                     std::function<void(Vector&)> modification ) const;
+                     std::function<void(Vector&)> modification =
+                         functional::to_void<Vector> ) const;
 
     // This version spits out a new vector:
     EigenvalueSolver::result get_eigenpair( int nev ) const;
@@ -189,4 +191,42 @@ class EigenvalueSolver
     Type problem_type;
     Which which;
 };
+
+
+template <typename Scalar>
+void
+EigenvalueSolver::save_basis( const std::string& filename,
+                              std::function<void(Vector&)> modification ) const
+{
+    if ( num_converged() < 1 ) return;
+
+    VecScatter scatter;
+    Vec local;
+    const PetscScalar* array;
+    PetscInt start, end;
+
+    Vector a = op().get_right_vector();
+    std::vector<Scalar> temp;
+
+    VecScatterCreateToZero( a.v_, &scatter, &local );
+
+    for ( auto a : *this ) {
+        modification( a.evector );
+        VecScatterBegin( scatter, a.evector.v_, local, INSERT_VALUES,
+                         SCATTER_FORWARD );
+        VecScatterEnd( scatter, a.evector.v_, local, INSERT_VALUES,
+                       SCATTER_FORWARD );
+
+        VecGetOwnershipRange( local, &start, &end );
+        VecGetArrayRead( local, &array );
+
+        for ( int i = start; i < end; ++i ) {
+            temp.push_back( functional::from_complex<Scalar>( array[i] ) );
+        }
+
+        VecRestoreArrayRead( local, &array );
+        util::export_vector_binary( filename, temp, true );
+        temp.clear();
+    }
+}
 }
