@@ -157,9 +157,10 @@ class Matrix
     {
         MatType t;
         MatGetType( m_, &t );
-        if ( t )
+        if ( t ) {
             mat_type = to_type( t );
-        else
+            has_type = true;
+        } else
             has_type = false;
         PetscBool b;
         MatAssembled( m_, &b );
@@ -171,9 +172,10 @@ class Matrix
     {
         MatType t;
         MatGetType( other.m_, &t );
-        if ( t )
+        if ( t ) {
             mat_type = to_type( t );
-        else
+            has_type = true;
+        } else
             has_type = false;
         PetscBool b;
         MatAssembled( other.m_, &b );
