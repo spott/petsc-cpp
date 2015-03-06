@@ -38,3 +38,8 @@ syntax_check: chkopts
 format:
 	clang-format -style=file -i ${SOURCES}
 	clang-format -style=file -i ${HEADERS}
+
+cleanup:
+	rm ${OBJECTS}
+	rm ${COBJECT}
+	rm ${LIB}
