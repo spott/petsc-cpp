@@ -43,10 +43,16 @@ void Matrix::set_option( const MatOption o, bool b )
 void Matrix::set_size( const int n_global,
                        const int m_global,
                        const int n_local,
-                       const int m_local )
+                       const int m_local,
+                       const int n_block,
+                       const int m_block )
 {
     l.lock();
     MatSetSizes( m_, n_local, m_local, n_global, m_global );
+    if ( block_type( mat_type ) && n_block != m_block )
+        MatSetBlockSizes( m_, n_block, m_block );
+    else if ( block_type( mat_type ) && n_block != 1 )
+        MatSetBlockSize( m_, n_block );
     l.unlock();
 }
 

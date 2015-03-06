@@ -6,6 +6,7 @@
 #include <mutex>
 #include <vector>
 #include <cassert>
+#include <string>
 
 #include <petsc_cpp/Petsc.hpp>
 
@@ -15,74 +16,174 @@ namespace petsc
 class Matrix
 {
   public:
+    enum class type {
+        aij,
+        mpi_aij,
+        seq_aij,
+        block_aij,
+        mpi_block_aij,
+        seq_block_aij,
+        symm_block_aij,
+        mpi_symm_block_aij,
+        seq_symm_block_aij,
+        dense,
+        mpi_dense,
+        seq_dense,
+        // shell
+    };
+
+  private:
+    static bool block_type( type t )
+    {
+        return t == type::block_aij || t == type::seq_block_aij ||
+               t == type::mpi_block_aij || t == type::symm_block_aij ||
+               t == type::seq_symm_block_aij || t == type::mpi_symm_block_aij;
+    }
+
+    static MatType to_MatType( type t )
+    {
+        switch ( t ) {
+            case type::aij:
+                return MATAIJ;
+            case type::seq_aij:
+                return MATSEQAIJ;
+            case type::mpi_aij:
+                return MATMPIAIJ;
+
+            case type::block_aij:
+                return MATBAIJ;
+            case type::seq_block_aij:
+                return MATSEQBAIJ;
+            case type::mpi_block_aij:
+                return MATMPIAIJ;
+
+            case type::symm_block_aij:
+                return MATSBAIJ;
+            case type::seq_symm_block_aij:
+                return MATSEQSBAIJ;
+            case type::mpi_symm_block_aij:
+                return MATMPISBAIJ;
+
+            case type::dense:
+                return MATDENSE;
+            case type::seq_dense:
+                return MATSEQDENSE;
+            case type::mpi_dense:
+                return MATMPIDENSE;
+
+                // case type::shell:
+                // return MATSHELL;
+        }
+    }
+
+    static type to_type( MatType t )
+    {
+        if ( t == MATAIJ ) return type::aij;
+        if ( t == MATSEQAIJ ) return type::seq_aij;
+        if ( t == MATMPIAIJ ) return type::mpi_aij;
+
+        if ( t == MATBAIJ ) return type::block_aij;
+        if ( t == MATSEQBAIJ ) return type::seq_block_aij;
+        if ( t == MATMPIAIJ ) return type::mpi_block_aij;
+
+        if ( t == MATSBAIJ ) return type::symm_block_aij;
+        if ( t == MATSEQSBAIJ ) return type::seq_symm_block_aij;
+        if ( t == MATMPISBAIJ ) return type::mpi_symm_block_aij;
+
+        if ( t == MATDENSE ) return type::dense;
+        if ( t == MATSEQDENSE ) return type::seq_dense;
+        if ( t == MATMPIDENSE ) return type::mpi_dense;
+
+        // if ( t == MATSHELL ) return type::shell;
+
+        throw std::out_of_range( std::string( "type not supported " ) +
+                                 static_cast<const char*>( t ) );
+    }
+
+  public:
     // constructors:
     Matrix( const MPI_Comm comm = PETSC_COMM_WORLD ) : has_type( false )
     {
         MatCreate( comm, &m_ );
     }
 
-    Matrix( const MatType t /*= MATMPIAIJ*/,
+    Matrix( const type t /*= MATMPIAIJ*/,
             const MPI_Comm comm = PETSC_COMM_WORLD )
+        : mat_type( t )
     {
         MatCreate( comm, &m_ );
-        MatSetType( m_, t );
+        MatSetType( m_, to_MatType( t ) );
         has_type = true;
-    }
-
-    // Matrix( unsigned int N,
-    //         unsigned int M,
-    //         MatMult_t F,
-    //         const MPI_Comm comm = PETSC_COMM_WORLD )
-    // {
-    //     int m, n;
-    //     Vec y, x;
-    //     VecCreateMPI( comm, PETSC_DECIDE, M, &y );
-    //     VecCreateMPI( comm, PETSC_DECIDE, N, &x );
-    //     VecGetLocalSize( y, &m );
-    //     VecGetLocalSize( x, &n );
-    //     MatCreateShell( comm, m, n, M, N, ctx, &m_ );
-    //     MatShellSetOperation( m_, MATOP_MULT, (void (*)( void ))F );
-    // }
-
-    // square:
-    Matrix( unsigned int N,
-            const MatType t = MATAIJ,
-            const MPI_Comm comm = PETSC_COMM_WORLD )
-    {
-        MatCreate( comm, &m_ );
-        MatSetType( m_, t );
-        has_type = true;
-        MatSetSizes( m_, PETSC_DECIDE, PETSC_DECIDE, static_cast<int>( N ),
-                     static_cast<int>( N ) );
     }
 
     // non-square:
     Matrix( unsigned int N,
             unsigned int M,
-            const MatType t = MATMPIAIJ,
+            const type t = type::block_aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )
+        : Matrix( t, comm )
     {
-        MatCreate( comm, &m_ );
-        MatSetType( m_, t );
-        has_type = true;
+        assert( N != M &&
+                ( t == type::symm_block_aij || t == type::seq_symm_block_aij ||
+                  t == type::mpi_symm_block_aij ) );
         MatSetSizes( m_, PETSC_DECIDE, PETSC_DECIDE, static_cast<int>( N ),
                      static_cast<int>( M ) );
+    }
+
+    // square:
+    Matrix( unsigned int N,
+            const type t = type::block_aij,
+            const MPI_Comm comm = PETSC_COMM_WORLD )
+        : Matrix( N, N, t, comm )
+    {
+    }
+
+    // non-square, blocked:
+    Matrix( unsigned int N,
+            unsigned int M,
+            unsigned int block_size,
+            const type t = type::block_aij,
+            const MPI_Comm comm = PETSC_COMM_WORLD )
+        : Matrix( N, M, t, comm )
+    {
+        assert( block_type( mat_type ) );
+        MatSetBlockSize( m_, block_size );
     }
 
     // assume that the matrix actually has a type... this should only be
     // used in the implementation, but might be used if I forgot a
     // function:
-    Matrix( Mat in ) : m_( in ), has_type( true ), assembled( true ) {}
+    Matrix( Mat in ) : m_( in )
+    {
+        MatType t;
+        MatGetType( m_, &t );
+        if ( t )
+            mat_type = to_type( t );
+        else
+            has_type = false;
+        PetscBool b;
+        MatAssembled( m_, &b );
+        b == PETSC_TRUE ? assembled = true : assembled = false;
+    }
 
     // rule of 4.5:
     Matrix( const Matrix& other )
     {
+        MatType t;
+        MatGetType( other.m_, &t );
+        if ( t )
+            mat_type = to_type( t );
+        else
+            has_type = false;
+        PetscBool b;
+        MatAssembled( other.m_, &b );
+        b == PETSC_TRUE ? assembled = true : assembled = false;
         MatConvert( other.m_, MATSAME, MAT_INITIAL_MATRIX, &m_ );
     }
 
     Matrix( Matrix&& other )
         : m_( other.m_ ), has_type( other.has_type ),
-          assembled( other.assembled )
+          assembled( other.assembled ), l(), mat_type( other.mat_type )
     {
         other.m_ = PETSC_NULL;
     }
@@ -104,7 +205,9 @@ class Matrix
     void set_size( const int n_global,
                    const int m_global,
                    const int n_local,
-                   const int m_local );
+                   const int m_local,
+                   const int n_block = 1,
+                   const int m_block = 1 );
 
     // set value:
     void set_value( const int n, const int m, PetscScalar v );
@@ -178,10 +281,10 @@ class Matrix
 
   private:
     // state:
-    bool has_type;
-    bool assembled;
+    bool has_type{false};
+    bool assembled{false};
     std::mutex l;
-
+    type mat_type;
     friend class Vector;
 };
 
