@@ -1,4 +1,4 @@
-PETSC_DIR=/usr/local/Cellar/petsc/3.5.2-debug
+PETSC_DIR=/usr/local/Cellar/petsc/3.5.3-debug
 SLEPC_DIR=/usr/local/Cellar/slepc/3.5.3-debug
 
 #include ${PETSC_DIR}/conf/variables

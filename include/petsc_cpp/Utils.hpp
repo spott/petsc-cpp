@@ -11,6 +11,9 @@
 #include <array>
 #include <mutex>
 
+// petsc:
+#include <petsc_cpp/Petsc.hpp>
+
 namespace petsc
 {
 
@@ -22,9 +25,6 @@ inline void populate_matrix( Matrix& m_,
     // Local objects:
     PetscInt rowstart, rowend;
     // PetscInt colstart, colend;
-
-    int rank;
-    MPI_Comm_rank( m_.comm(), &rank );
 
     auto ranges = m_.get_ownership_rows();
     rowstart = ranges[0];
@@ -46,8 +46,6 @@ inline void populate_matrix( Matrix& m_,
 inline void populate_vector( Vector& v_,
                              std::function<PetscScalar(int)> values )
 {
-    int rank;
-    MPI_Comm_rank( v_.comm(), &rank );
     auto ranges = v_.get_ownership_rows();
 
     PetscScalar value;
