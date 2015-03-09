@@ -248,3 +248,35 @@ inline void export_vector_binary( const std::string& filename,
     }
 }
 }
+
+namespace functional
+{
+
+template <typename T>
+inline void to_void( T& a )
+{
+    return;
+};
+
+template <typename T>
+inline T id( T& a )
+{
+    return a;
+};
+
+template <typename Scalar>
+inline Scalar from_complex( std::complex<double> a );
+
+template <>
+std::complex<double> inline from_complex<std::complex<double>>(
+    std::complex<double> a )
+{
+    return a;
+}
+
+template <>
+inline double from_complex<double>( std::complex<double> a )
+{
+    return a.real();
+}
+}
