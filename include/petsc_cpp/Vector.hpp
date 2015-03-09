@@ -38,11 +38,11 @@ class Vector
 
     static type to_type( VecType t )
     {
-        if ( t == VECSEQ ) return type::seq;
-        if ( t == VECMPI ) return type::mpi;
-        if ( t == VECSTANDARD ) return type::standard;
-        throw std::out_of_range( std::string( "type not supported " ) +
-                                 static_cast<const char*>( t ) );
+        if ( std::strcmp( t, VECSEQ ) ) return type::seq;
+        if ( std::strcmp( t, VECMPI ) ) return type::mpi;
+        if ( std::strcmp( t, VECSTANDARD ) ) return type::standard;
+        throw std::out_of_range( std::string( "type not supported |" ) +
+                                 static_cast<const char*>( t ) + "|" );
     }
 
 

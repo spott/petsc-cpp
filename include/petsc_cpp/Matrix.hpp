@@ -78,21 +78,21 @@ class Matrix
 
     static type to_type( MatType t )
     {
-        if ( t == MATAIJ ) return type::aij;
-        if ( t == MATSEQAIJ ) return type::seq_aij;
-        if ( t == MATMPIAIJ ) return type::mpi_aij;
+        if ( std::strcmp( t, MATAIJ ) ) return type::aij;
+        if ( std::strcmp( t, MATSEQAIJ ) ) return type::seq_aij;
+        if ( std::strcmp( t, MATMPIAIJ ) ) return type::mpi_aij;
 
-        if ( t == MATBAIJ ) return type::block_aij;
-        if ( t == MATSEQBAIJ ) return type::seq_block_aij;
-        if ( t == MATMPIAIJ ) return type::mpi_block_aij;
+        if ( std::strcmp( t, MATBAIJ ) ) return type::block_aij;
+        if ( std::strcmp( t, MATSEQBAIJ ) ) return type::seq_block_aij;
+        if ( std::strcmp( t, MATMPIAIJ ) ) return type::mpi_block_aij;
 
-        if ( t == MATSBAIJ ) return type::symm_block_aij;
-        if ( t == MATSEQSBAIJ ) return type::seq_symm_block_aij;
-        if ( t == MATMPISBAIJ ) return type::mpi_symm_block_aij;
+        if ( std::strcmp( t, MATSBAIJ ) ) return type::symm_block_aij;
+        if ( std::strcmp( t, MATSEQSBAIJ ) ) return type::seq_symm_block_aij;
+        if ( std::strcmp( t, MATMPISBAIJ ) ) return type::mpi_symm_block_aij;
 
-        if ( t == MATDENSE ) return type::dense;
-        if ( t == MATSEQDENSE ) return type::seq_dense;
-        if ( t == MATMPIDENSE ) return type::mpi_dense;
+        if ( std::strcmp( t, MATDENSE ) ) return type::dense;
+        if ( std::strcmp( t, MATSEQDENSE ) ) return type::seq_dense;
+        if ( std::strcmp( t, MATMPIDENSE ) ) return type::mpi_dense;
 
         // if ( t == MATSHELL ) return type::shell;
 
@@ -119,20 +119,20 @@ class Matrix
     // non-square:
     Matrix( unsigned int N,
             unsigned int M,
-            const type t = type::block_aij,
+            const type t = type::aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : Matrix( t, comm )
     {
-        assert( N != M &&
-                ( t == type::symm_block_aij || t == type::seq_symm_block_aij ||
-                  t == type::mpi_symm_block_aij ) );
+        assert( N == M &&
+                !( t == type::symm_block_aij || t == type::seq_symm_block_aij ||
+                   t == type::mpi_symm_block_aij ) );
         MatSetSizes( m_, PETSC_DECIDE, PETSC_DECIDE, static_cast<int>( N ),
                      static_cast<int>( M ) );
     }
 
     // square:
     Matrix( unsigned int N,
-            const type t = type::block_aij,
+            const type t = type::aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : Matrix( N, N, t, comm )
     {
@@ -142,7 +142,7 @@ class Matrix
     Matrix( unsigned int N,
             unsigned int M,
             unsigned int block_size,
-            const type t = type::block_aij,
+            const type t = type::aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : Matrix( N, M, t, comm )
     {
