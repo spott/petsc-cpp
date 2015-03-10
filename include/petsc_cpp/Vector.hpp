@@ -56,9 +56,10 @@ class Vector
 
     Vector( int size,
             const type t = type::standard,
-            const MPI_Comm comm = PETSC_COMM_WORLD )
+            MPI_Comm comm = PETSC_COMM_WORLD )
         : has_type( true ), assembled( false ), vec_type( t )
     {
+        if ( t == type::seq ) comm = PETSC_COMM_SELF;
         VecCreate( comm, &v_ );
         VecSetType( v_, to_VecType( t ) );
         VecSetSizes( v_, PETSC_DECIDE, size );
