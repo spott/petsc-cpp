@@ -180,6 +180,8 @@ class Vector
 
     Vector duplicate() const;
     void print() const;
+    static void draw( const std::vector<Vector>& vectors,
+                      const std::vector<double>* v = nullptr );
     void draw( const std::vector<double>* v = nullptr ) const;
 
     void to_file( const std::string& filename ) const;
