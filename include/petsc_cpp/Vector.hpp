@@ -65,6 +65,35 @@ class Vector
         VecSetSizes( v_, PETSC_DECIDE, size );
     }
 
+    Vector( std::unique_ptr<std::vector<std::complex<double>>> input,
+            const type t = type::seq )
+        : has_type( true ), assembled( true ), vec_type( t ),
+          data( std::move( input ) )
+    {
+        assert( t != type::standard );
+        if ( t == type::seq )
+            VecCreateSeqWithArray( PETSC_COMM_SELF, 1, this->data->size(),
+                                   this->data->data(), &v_ );
+        if ( t == type::mpi )
+            VecCreateMPIWithArray( PETSC_COMM_WORLD, 1, this->data->size(),
+                                   PETSC_DECIDE, this->data->data(), &v_ );
+        assemble();
+    }
+
+    Vector( const std::complex<double>* input,
+            const size_t size,
+            const type t = type::seq )
+        : has_type( true ), assembled( true ), vec_type( t )
+    {
+        assert( t != type::standard );
+        if ( t == type::seq )
+            VecCreateSeqWithArray( PETSC_COMM_SELF, 1, size, input, &v_ );
+        if ( t == type::mpi )
+            VecCreateMPIWithArray( PETSC_COMM_WORLD, 1, size, PETSC_DECIDE,
+                                   input, &v_ );
+        assemble();
+    }
+
 
     /*************
     //rule of 4.5:
@@ -80,7 +109,8 @@ class Vector
     // move constructor:
     Vector( Vector&& other )
         : v_( other.v_ ), has_type( other.has_type ),
-          assembled( other.assembled ), vec_type( other.vec_type ), l()
+          assembled( other.assembled ), vec_type( other.vec_type ), l(),
+          data( std::move( other.data ) )
     {
         other.v_ = PETSC_NULL;
     }
@@ -167,6 +197,7 @@ class Vector
     bool assembled;
     type vec_type;
     std::mutex l;
+    std::unique_ptr<std::vector<std::complex<double>>> data;
 
     friend class Matrix;
 };
