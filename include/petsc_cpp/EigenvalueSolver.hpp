@@ -132,6 +132,7 @@ class EigenvalueSolver
 
     template <typename Scalar>
     void save_basis( const std::string& filename,
+                     std::array<int, 2> range = {{0, -1}},
                      std::function<void(Vector&)> modification =
                          functional::to_void<Vector> ) const;
 
@@ -198,37 +199,47 @@ class EigenvalueSolver
 template <typename Scalar>
 void
 EigenvalueSolver::save_basis( const std::string& filename,
+                              std::array<int, 2> range,
                               std::function<void(Vector&)> modification ) const
 {
     if ( num_converged() < 1 ) return;
+    if ( range[1] < 0 || range[1] > num_converged() )
+        range[1] = num_converged();
+    assert( range[1] - range[0] != 0 );
 
     VecScatter scatter;
     Vec local;
     const PetscScalar* array;
     PetscInt start, end;
-
-    Vector a = op().get_right_vector();
     std::vector<Scalar> temp;
 
-    VecScatterCreateToZero( a.v_, &scatter, &local );
+    {
+        Vector a = op().get_right_vector();
+        VecScatterCreateToZero( a.v_, &scatter, &local );
+    }
 
-    for ( auto a : *this ) {
-        modification( a.evector );
-        VecScatterBegin( scatter, a.evector.v_, local, INSERT_VALUES,
-                         SCATTER_FORWARD );
-        VecScatterEnd( scatter, a.evector.v_, local, INSERT_VALUES,
-                       SCATTER_FORWARD );
+    for ( auto it = this->begin() + range[0]; it != this->begin() + range[1];
+          it += math::signum( range[1] - range[0] ) ) {
+        auto b = ( *it ).evector;
+        modification( b );
 
-        VecGetOwnershipRange( local, &start, &end );
-        VecGetArrayRead( local, &array );
+        VecScatterBegin( scatter, b.v_, local, INSERT_VALUES, SCATTER_FORWARD );
+        VecScatterEnd( scatter, b.v_, local, INSERT_VALUES, SCATTER_FORWARD );
 
-        for ( int i = start; i < end; ++i ) {
-            temp.push_back( functional::from_complex<Scalar>( array[i] ) );
+        if ( !rank() ) {
+            VecGetOwnershipRange( local, &start, &end );
+            assert( start == 0 );
+            VecGetArrayRead( local, &array );
+
+            for ( int i = start; i < end; ++i ) {
+                temp.push_back(
+                    functional::from_complex<Scalar>( array[i - start] ) );
+            }
+
+            VecRestoreArrayRead( local, &array );
+            util::export_vector_binary( filename, temp, true );
+            temp.clear();
         }
-
-        VecRestoreArrayRead( local, &array );
-        util::export_vector_binary( filename, temp, true );
-        temp.clear();
     }
 }
 }
