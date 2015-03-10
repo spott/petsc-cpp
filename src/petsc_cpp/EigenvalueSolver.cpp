@@ -23,12 +23,18 @@ void swap( EigenvalueSolver& first, EigenvalueSolver& second ) // nothrow
 
 MPI_Comm EigenvalueSolver::comm() const
 {
-    static MPI_Comm comm = [=]() {
-        MPI_Comm c;
-        PetscObjectGetComm( (PetscObject)e_, &c );
-        return c;
-    }();
-    return comm;
+    MPI_Comm c;
+    PetscObjectGetComm( (PetscObject)e_, &c );
+    return c;
+}
+
+int EigenvalueSolver::rank() const
+{
+    MPI_Comm c;
+    int rank;
+    PetscObjectGetComm( (PetscObject)e_, &c );
+    MPI_Comm_rank( c, &rank );
+    return rank;
 }
 
 
@@ -145,6 +151,8 @@ EigenvalueSolver::result EigenvalueSolver::get_eigenpair( int nev ) const
         v /= std::sqrt( inner_product( v, *inner_product_space_mat, v ) );
     else if ( inner_product_space_diag != nullptr )
         v /= std::sqrt( inner_product( v, *inner_product_space_diag, v ) );
+    else
+        std::cerr << "didn't renormalize eigenpair " << nev << std::endl;
     return result{nev, ev, v};
 }
 

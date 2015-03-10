@@ -143,22 +143,16 @@ MPI_Comm Vector::comm() const
 
 size_t Vector::size() const
 {
-    static int n = [=]() {
-        int i;
-        VecGetSize( v_, &i );
-        return i;
-    }();
-    return static_cast<size_t>( n );
+    int i;
+    VecGetSize( v_, &i );
+    return static_cast<size_t>( i );
 }
 
 std::array<int, 2> Vector::get_ownership_rows() const
 {
-    static std::array<int, 2> n = [=]() {
-        std::array<int, 2> m;
-        VecGetOwnershipRange( v_, &m[0], &m[1] );
-        return m;
-    }();
-    return n;
+    std::array<int, 2> m;
+    VecGetOwnershipRange( v_, &m[0], &m[1] );
+    return m;
 }
 
 Vector Vector::duplicate() const

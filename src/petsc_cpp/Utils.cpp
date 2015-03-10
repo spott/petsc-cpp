@@ -24,7 +24,7 @@ PetscScalar inner_product( const Vector& l, const Vector& m, const Vector& r )
 PetscScalar inner_product( const Vector& l, const Matrix& m, const Vector& r )
 {
     PetscScalar out;
-    Vector rm = m.get_right_vector();
+    Vector rm = m.get_left_vector();
     MatMult( m.m_, r.v_, rm.v_ );
     VecDot( rm.v_, l.v_, &out );
     return out;

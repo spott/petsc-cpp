@@ -101,7 +101,6 @@ inline Vector& map<Vector>( const Vector& v_,
     VecRestoreArray( out.v_, &b );
 
     return out;
-    ;
 }
 
 template <typename T>

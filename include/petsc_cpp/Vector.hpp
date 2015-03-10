@@ -5,6 +5,7 @@
 #include <array>
 #include <mutex>
 #include <vector>
+#include <cassert>
 
 #include <petsc_cpp/Petsc.hpp>
 

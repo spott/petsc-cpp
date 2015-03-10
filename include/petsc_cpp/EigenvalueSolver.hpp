@@ -45,6 +45,7 @@ class EigenvalueSolver
           which( which )
     {
         assert( type == Type::hermitian || type == Type::nonhermitian );
+        assert( space.comm() == A.comm() );
         EPSCreate( A.comm(), &e_ );
         EPSSetOperators( e_, A.m_, PETSC_NULL );
         EPSSetProblemType( e_, static_cast<EPSProblemType>( type ) );
@@ -97,6 +98,7 @@ class EigenvalueSolver
 
     // Getters:
     MPI_Comm comm() const;
+    int rank() const;
 
     Matrix& op() const;
     Matrix& op( Matrix& op );
