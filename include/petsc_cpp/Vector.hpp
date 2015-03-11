@@ -118,7 +118,8 @@ class Vector
     // used in
     // the implementation, but might be used if
     // I forgot a function;
-    Vector( Vec& in ) : v_( in ), assembled( true )
+    Vector( Vec& in, bool owned = true )
+        : v_( in ), assembled( true ), owned( owned )
     {
         VecType t;
         VecGetType( v_, &t );
@@ -196,6 +197,7 @@ class Vector
     // state:
     bool has_type;
     bool assembled;
+    bool owned{true};
     type vec_type;
     std::mutex l;
     std::unique_ptr<std::vector<std::complex<double>>> data;

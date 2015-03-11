@@ -152,7 +152,7 @@ class Matrix
     // assume that the matrix actually has a type... this should only be
     // used in the implementation, but might be used if I forgot a
     // function:
-    Matrix( Mat in ) : m_( in )
+    Matrix( Mat& in, bool owned = true ) : m_( in ), owned( owned )
     {
         MatType t;
         MatGetType( m_, &t );
@@ -169,17 +169,7 @@ class Matrix
     // rule of 4.5:
     Matrix( const Matrix& other )
     {
-        MatType t;
-        MatGetType( other.m_, &t );
-        if ( t ) {
-            mat_type = to_type( t );
-            has_type = true;
-        } else
-            has_type = false;
-        PetscBool b;
-        MatAssembled( other.m_, &b );
-        b == PETSC_TRUE ? assembled = true : assembled = false;
-        MatConvert( other.m_, MATSAME, MAT_INITIAL_MATRIX, &m_ );
+        MatDuplicate( other.m_, MAT_COPY_VALUES, &m_ );
     }
 
     Matrix( Matrix&& other )
@@ -190,13 +180,20 @@ class Matrix
     }
 
     // assignment operator:
-    Matrix& operator=( Matrix other );
+    Matrix& operator=( const Matrix& other );
+    Matrix& operator+=( const Vector& D );
+    Matrix& operator*=( const std::complex<double>& alpha );
+    Matrix& operator/=( const std::complex<double>& alpha );
+    Matrix& shallow_copy( const Matrix& a );
 
     // destructor:
-    ~Matrix() { MatDestroy( &m_ ); }
+    ~Matrix()
+    {
+        if ( owned ) MatDestroy( &m_ );
+    }
 
     // swap!
-    friend void swap( Matrix& first, Matrix& second ); // nothrow
+    friend void swap( Matrix& first, Matrix& second ) noexcept; // nothrow
 
     // modifiers:
     void set_type( const MatType t );
@@ -284,6 +281,7 @@ class Matrix
     // state:
     bool has_type{false};
     bool assembled{false};
+    bool owned{true};
     std::mutex l;
     type mat_type;
     friend class Vector;
