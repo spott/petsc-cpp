@@ -1,5 +1,4 @@
 #include <petsc_cpp/Petsc.hpp>
-#include <petsc_cpp/Matrix.hpp>
 
 extern "C" {
 #include <petsc_cpp/HermitianTranspose.h>

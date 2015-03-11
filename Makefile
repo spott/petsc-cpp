@@ -12,7 +12,7 @@ LDFLAGS=
 CSOURCE=src/petsc_cpp/HermitianTranspose.c
 CHEADER=include/petsc_cpp/HermitianTranspose.h
 SOURCES=src/petsc_cpp/Matrix.cpp src/petsc_cpp/Vector.cpp src/petsc_cpp/EigenvalueSolver.cpp src/petsc_cpp/Utils.cpp test.cpp
-HEADERS=include/petsc_cpp/Matrix.hpp include/petsc_cpp/Vector.hpp include/petsc_cpp/Petsc.hpp include/petsc_cpp/Utils.hpp include/petsc_cpp/EigenvalueSolver.hpp
+HEADERS=include/petsc_cpp/Matrix.hpp include/petsc_cpp/Vector.hpp include/petsc_cpp/Petsc.hpp include/petsc_cpp/Utils.hpp include/petsc_cpp/EigenvalueSolver.hpp include/petsc_cpp/TimeStepper.hpp
 OBJECTS=$(SOURCES:.cpp=.o)
 COBJECT=$(CSOURCE:.c=.o)
 EXECUTABLE=test
@@ -26,10 +26,10 @@ ${COBJECT}:
 	mpicc src/petsc_cpp/HermitianTranspose.c -o src/petsc_cpp/HermitianTranspose.o -c -I/Users/spott/Code/libs/petsc-3.5.3/include/ -I${PETSC_DIR}/include/
 
 ${EXECUTABLE}: ${OBJECTS} ${COBJECT} chkopts
-	echo ${OBJECTS}
 	${CLINKER} -o ${EXECUTABLE} ${COBJECT} ${OBJECTS} ${LDFLAGS} ${PETSC_VEC_LIB} ${SLEPC_LIB}
 
 library: ${OBJECTS} ${COBJECT}
+	-mkdir lib/
 	ar rus ${LIB} ${COBJECT} ${OBJECTS}
 
 syntax_check: chkopts
@@ -40,6 +40,6 @@ format:
 	clang-format -style=file -i ${HEADERS}
 
 cleanup:
-	rm ${OBJECTS}
-	rm ${COBJECT}
-	rm ${LIB}
+	-rm ${OBJECTS}
+	-rm ${COBJECT}
+	-rm ${LIB}

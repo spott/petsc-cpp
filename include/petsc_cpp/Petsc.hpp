@@ -5,10 +5,9 @@
 #include <array>
 #include <mutex>
 
+#include <petsc.h>
 #ifdef SLEPC
 #include <slepc.h>
-#else
-#include <petsc.h>
 #endif
 
 // forward definitions:
@@ -20,10 +19,10 @@ class Matrix;
 #include <petsc_cpp/Vector.hpp>
 #include <petsc_cpp/Matrix.hpp>
 #include <petsc_cpp/Utils.hpp>
-//#include <petsc_cpp/TimeStepper.hpp>
 #ifdef SLEPC
 #include <petsc_cpp/EigenvalueSolver.hpp>
 #endif
+#include <petsc_cpp/TimeStepper.hpp>
 
 
 namespace petsc

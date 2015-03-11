@@ -1,7 +1,4 @@
 #include <petsc_cpp/Petsc.hpp>
-#include <petsc_cpp/Vector.hpp>
-#include <petsc_cpp/Utils.hpp>
-//#include <util.hpp>
 
 namespace petsc
 {

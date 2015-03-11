@@ -8,7 +8,6 @@
 #include <cassert>
 #include <string>
 
-#include <petsc_cpp/Petsc.hpp>
 
 namespace petsc
 {

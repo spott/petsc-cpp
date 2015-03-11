@@ -12,7 +12,6 @@
 #include <mutex>
 
 // petsc:
-#include <petsc_cpp/Petsc.hpp>
 
 namespace petsc
 {

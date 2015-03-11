@@ -1,4 +1,6 @@
 #define SLEPC
+#include <slepc.h>
+
 
 #include <stdexcept>
 #include <petsc_cpp/Petsc.hpp>
