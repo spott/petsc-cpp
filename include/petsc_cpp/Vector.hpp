@@ -5,8 +5,8 @@
 #include <array>
 #include <mutex>
 #include <vector>
+#include <cassert>
 
-#include <petsc_cpp/Petsc.hpp>
 
 namespace petsc
 {
@@ -38,11 +38,11 @@ class Vector
 
     static type to_type( VecType t )
     {
-        if ( t == VECSEQ ) return type::seq;
-        if ( t == VECMPI ) return type::mpi;
-        if ( t == VECSTANDARD ) return type::standard;
-        throw std::out_of_range( std::string( "type not supported " ) +
-                                 static_cast<const char*>( t ) );
+        if ( std::strcmp( t, VECSEQ ) ) return type::seq;
+        if ( std::strcmp( t, VECMPI ) ) return type::mpi;
+        if ( std::strcmp( t, VECSTANDARD ) ) return type::standard;
+        throw std::out_of_range( std::string( "type not supported |" ) +
+                                 static_cast<const char*>( t ) + "|" );
     }
 
 
@@ -55,12 +55,42 @@ class Vector
 
     Vector( int size,
             const type t = type::standard,
-            const MPI_Comm comm = PETSC_COMM_WORLD )
+            MPI_Comm comm = PETSC_COMM_WORLD )
         : has_type( true ), assembled( false ), vec_type( t )
     {
+        if ( t == type::seq ) comm = PETSC_COMM_SELF;
         VecCreate( comm, &v_ );
         VecSetType( v_, to_VecType( t ) );
         VecSetSizes( v_, PETSC_DECIDE, size );
+    }
+
+    Vector( std::unique_ptr<std::vector<std::complex<double>>> input,
+            const type t = type::seq )
+        : has_type( true ), assembled( true ), vec_type( t ),
+          data( std::move( input ) )
+    {
+        assert( t != type::standard );
+        if ( t == type::seq )
+            VecCreateSeqWithArray( PETSC_COMM_SELF, 1, this->data->size(),
+                                   this->data->data(), &v_ );
+        if ( t == type::mpi )
+            VecCreateMPIWithArray( PETSC_COMM_WORLD, 1, this->data->size(),
+                                   PETSC_DECIDE, this->data->data(), &v_ );
+        assemble();
+    }
+
+    Vector( const std::complex<double>* input,
+            const size_t size,
+            const type t = type::seq )
+        : has_type( true ), assembled( true ), vec_type( t )
+    {
+        assert( t != type::standard );
+        if ( t == type::seq )
+            VecCreateSeqWithArray( PETSC_COMM_SELF, 1, size, input, &v_ );
+        if ( t == type::mpi )
+            VecCreateMPIWithArray( PETSC_COMM_WORLD, 1, size, PETSC_DECIDE,
+                                   input, &v_ );
+        assemble();
     }
 
 
@@ -78,7 +108,8 @@ class Vector
     // move constructor:
     Vector( Vector&& other )
         : v_( other.v_ ), has_type( other.has_type ),
-          assembled( other.assembled ), vec_type( other.vec_type ), l()
+          assembled( other.assembled ), vec_type( other.vec_type ), l(),
+          data( std::move( other.data ) )
     {
         other.v_ = PETSC_NULL;
     }
@@ -87,7 +118,8 @@ class Vector
     // used in
     // the implementation, but might be used if
     // I forgot a function;
-    Vector( Vec& in ) : v_( in ), assembled( true )
+    Vector( Vec& in, bool owned = true )
+        : v_( in ), assembled( true ), owned( owned )
     {
         VecType t;
         VecGetType( v_, &t );
@@ -148,6 +180,8 @@ class Vector
 
     Vector duplicate() const;
     void print() const;
+    static void draw( const std::vector<Vector>& vectors,
+                      const std::vector<double>* v = nullptr );
     void draw( const std::vector<double>* v = nullptr ) const;
 
     void to_file( const std::string& filename ) const;
@@ -163,8 +197,10 @@ class Vector
     // state:
     bool has_type;
     bool assembled;
+    bool owned{true};
     type vec_type;
     std::mutex l;
+    std::unique_ptr<std::vector<std::complex<double>>> data;
 
     friend class Matrix;
 };

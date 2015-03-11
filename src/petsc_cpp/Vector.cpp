@@ -1,7 +1,4 @@
 #include <petsc_cpp/Petsc.hpp>
-#include <petsc_cpp/Vector.hpp>
-#include <petsc_cpp/Utils.hpp>
-//#include <util.hpp>
 
 namespace petsc
 {
@@ -143,22 +140,16 @@ MPI_Comm Vector::comm() const
 
 size_t Vector::size() const
 {
-    static int n = [=]() {
-        int i;
-        VecGetSize( v_, &i );
-        return i;
-    }();
-    return static_cast<size_t>( n );
+    int i;
+    VecGetSize( v_, &i );
+    return static_cast<size_t>( i );
 }
 
 std::array<int, 2> Vector::get_ownership_rows() const
 {
-    static std::array<int, 2> n = [=]() {
-        std::array<int, 2> m;
-        VecGetOwnershipRange( v_, &m[0], &m[1] );
-        return m;
-    }();
-    return n;
+    std::array<int, 2> m;
+    VecGetOwnershipRange( v_, &m[0], &m[1] );
+    return m;
 }
 
 Vector Vector::duplicate() const
@@ -170,55 +161,93 @@ Vector Vector::duplicate() const
 
 void Vector::print() const { VecView( v_, PETSC_VIEWER_STDOUT_WORLD ); }
 
+void Vector::draw( const std::vector<Vector>& vectors,
+                   const std::vector<double>* v )
+{
+    static PetscViewer viewer = PETSC_VIEWER_DRAW_( vectors[0].comm() );
+    VecScatter scatter;
+    Vec local;
+    VecScatterCreateToZero( vectors[0].v_, &scatter, &local );
+    for ( auto i = 0u; i < vectors.size(); ++i ) {
+        PetscDraw draw;
+        PetscDrawLG lg;
+
+
+        PetscViewerDrawGetDraw( viewer, i, &draw );
+        PetscViewerDrawGetDrawLG( viewer, i, &lg );
+        PetscDrawSetTitle( draw, ( "Vector " + std::to_string( i ) ).c_str() );
+        PetscDrawSetDoubleBuffer( draw );
+        PetscDrawLGSetDimension( lg, 2 );
+        PetscDrawLGReset( lg );
+        if ( v != nullptr )
+            PetscDrawLGSetLimits( lg, v->front(), v->back(), -1, 1 );
+        else
+            PetscDrawLGSetLimits( lg, 0, vectors[i].size(), -1, 1 );
+        const PetscScalar* array;
+        PetscInt start, end;
+        // TODO: Need to scatter array first
+        VecScatterBegin( scatter, vectors[i].v_, local, INSERT_VALUES,
+                         SCATTER_FORWARD );
+        VecScatterEnd( scatter, vectors[i].v_, local, INSERT_VALUES,
+                       SCATTER_FORWARD );
+        VecGetArrayRead( local, &array );
+        if ( !vectors[0].rank() ) {
+            VecGetOwnershipRange( local, &start, &end );
+
+            for ( int i = 0; i < end - start; ++i ) {
+                PetscReal x[2] = {double( i + start ), double( i + start )};
+                if ( v != nullptr ) {
+                    x[0] = ( *v )[i];
+                    x[1] = ( *v )[i];
+                }
+                PetscReal y[2] = {array[i].real(), 10. * array[i].imag()};
+                PetscDrawLGAddPoint( lg, x, y );
+            }
+            VecRestoreArrayRead( vectors[i].v_, &array );
+        }
+
+        double p;
+        PetscDrawGetPause( draw, &p );
+        if ( i < vectors.size() - 1 ) PetscDrawSetPause( draw, 0 );
+        PetscDrawLGDraw( lg );
+        PetscDrawSetPause( draw, p );
+    }
+}
 
 void Vector::draw( const std::vector<double>* v ) const
 {
-    VecView( v_, PETSC_VIEWER_DRAW_WORLD );
-    // util::wait_for_key();
-    Vector imag{*this};
-    map( imag, []( PetscScalar a, int b ) { return a.imag(); } );
-    VecView( imag.v_, PETSC_VIEWER_DRAW_WORLD );
+    static PetscViewer viewer = PETSC_VIEWER_DRAW_( this->comm() );
+    PetscDraw draw;
+    PetscDrawLG lg;
 
-    // PetscViewer viewer;
-    // PetscDraw draw;
-    // PetscDrawLG lg;
-    // PetscViewerDrawOpen( PETSC_COMM_WORLD, NULL, NULL, 0, 0,
-    //                      PETSC_DRAW_HALF_SIZE, PETSC_DRAW_HALF_SIZE,
-    //                      &viewer );
-    // // PetscViewerPushFormat( viewer, PETSC_VIEWER_DRAW_LG );
-    // std::cerr << "a";
-    // PetscViewerDrawGetDraw( viewer, 0, &draw );
-    // PetscDrawLGCreate( draw, 2, &lg );
-    // PetscDrawSetFromOptions(draw);
-    // std::cerr << "b";
-    // int dim = 2;
-    // std::cerr << "c";
-    // PetscDrawLGGetDimension(lg, &dim);
+    PetscViewerDrawGetDraw( viewer, 0, &draw );
+    PetscViewerDrawGetDrawLG( viewer, 0, &lg );
+    PetscDrawSetTitle( draw, "Vector" );
+    PetscDrawSetDoubleBuffer( draw );
+    PetscDrawLGSetDimension( lg, 2 );
+    PetscDrawLGReset( lg );
+    if ( v != nullptr )
+        PetscDrawLGSetLimits( lg, v->front(), v->back(), -1, 1 );
+    else
+        PetscDrawLGSetLimits( lg, 0, this->size(), -1, 1 );
 
-    // // const PetscScalar* array;
-    // // PetscInt start, end;
-    // // // TODO: Need to scatter array first
-    // // VecGetArrayRead( v_, &array );
-    // // VecGetOwnershipRange( v_, &start, &end );
+    const PetscScalar* array;
+    PetscInt start, end;
+    // TODO: Need to scatter array first
+    VecGetArrayRead( v_, &array );
+    VecGetOwnershipRange( v_, &start, &end );
 
-    // // std::cerr << "debug1" << std::endl;
-
-    // // for ( int i = 0; i < end - start; ++i ) {
-    // //     PetscReal x[2] = {double( i + start ), double( i + start )};
-    // //     std::cerr << x[0] << ", " << x[1] << " : ";
-    // //     if ( v != nullptr ) {x[0] = ( *v )[i]; x[1] = ( *v )[i];}
-    // //     PetscReal y[2] = {array[i].real(), array[i].imag()};
-    // //     std::cerr << y[0] << ", " << y[1] << " | ";
-    // //     PetscDrawLGAddPoint( lg, x, y );
-    // // }
-    // // VecRestoreArrayRead( v_, &array );
-
-    // // PetscDrawSynchronizedFlush( draw );
-    // // // PetscDrawLGDestroy(lg);
-    // // // PetscDrawDestroy(lg);
-    // // // PetscViewerDe
-    // // // PetscDrawLGAddPoint(PetscDrawLG lg,const PetscReal *x,const
-    // // // PetscReal *y)
+    for ( int i = 0; i < end - start; ++i ) {
+        PetscReal x[2] = {double( i + start ), double( i + start )};
+        if ( v != nullptr ) {
+            x[0] = ( *v )[i];
+            x[1] = ( *v )[i];
+        }
+        PetscReal y[2] = {array[i].real(), array[i].imag()};
+        PetscDrawLGAddPoint( lg, x, y );
+    }
+    VecRestoreArrayRead( v_, &array );
+    PetscDrawLGDraw( lg );
 }
 
 void Vector::to_file( const std::string& filename ) const

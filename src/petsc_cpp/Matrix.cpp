@@ -1,5 +1,4 @@
 #include <petsc_cpp/Petsc.hpp>
-#include <petsc_cpp/Matrix.hpp>
 
 extern "C" {
 #include <petsc_cpp/HermitianTranspose.h>
@@ -8,19 +7,28 @@ extern "C" {
 namespace petsc
 {
 // assignment operator:
-Matrix& Matrix::operator=( Matrix other )
+Matrix& Matrix::operator=( const Matrix& other )
 {
-    swap( *this, other );
+    assert( other.assembled && assembled );
+    // assumption here that they have the same nonzero patter... this could
+    // definitely be wrong.
+    if ( mat_type == other.mat_type )
+        MatCopy( other.m_, m_, SAME_NONZERO_PATTERN );
+    else {
+        MatDestroy( &m_ );
+        MatConvert( other.m_, to_MatType( mat_type ), MAT_INITIAL_MATRIX, &m_ );
+    }
     return *this;
 }
 
-// swap!
-void swap( Matrix& first, Matrix& second ) // nothrow
+void swap( Matrix& first, Matrix& second ) noexcept
 {
     using std::swap;
 
     swap( first.has_type, second.has_type );
     swap( first.assembled, second.assembled );
+    swap( first.owned, second.owned );
+    swap( first.mat_type, second.mat_type );
     swap( first.m_, second.m_ );
 }
 
@@ -170,6 +178,23 @@ double Matrix::norm( NormType t )
     return norm;
 }
 
+Matrix& Matrix::operator*=( const std::complex<double>& alpha )
+{
+    MatScale( m_, alpha );
+    return *this;
+}
+Matrix& Matrix::operator/=( const std::complex<double>& alpha )
+{
+    MatScale( m_, 1. / alpha );
+    return *this;
+}
+
+Matrix& Matrix::operator+=( const Vector& D )
+{
+    MatDiagonalSet( m_, D.v_, ADD_VALUES );
+    return *this;
+}
+
 Vector Matrix::operator*( const Vector& v ) const
 {
     Vector out = this->get_left_vector();
@@ -177,7 +202,13 @@ Vector Matrix::operator*( const Vector& v ) const
     return out;
 }
 
-// print!
+Matrix& Matrix::shallow_copy( const Matrix& a )
+{
+    this->m_ = a.m_;
+    owned = false;
+    return *this;
+}
+
 void Matrix::print() const { MatView( m_, PETSC_VIEWER_STDOUT_WORLD ); }
 
 void Matrix::to_file( const std::string& filename ) const

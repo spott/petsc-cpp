@@ -8,9 +8,9 @@ PetscErrorCode MatMult_HTranspose( Mat N, Vec x, Vec y );
 
 PetscErrorCode MatMultAdd_HTranspose( Mat N, Vec v1, Vec v2, Vec v3 );
 
-PetscErrorCode MatMultTranspose_HTranspose( Mat N, Vec x, Vec y );
+PetscErrorCode MatMultHTranspose_HTranspose( Mat N, Vec x, Vec y );
 
-PetscErrorCode MatMultTransposeAdd_HTranspose( Mat N, Vec v1, Vec v2, Vec v3 );
+PetscErrorCode MatMultHTransposeAdd_HTranspose( Mat N, Vec v1, Vec v2, Vec v3 );
 
 PetscErrorCode MatDestroy_HTranspose( Mat N );
 

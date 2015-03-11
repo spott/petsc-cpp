@@ -8,7 +8,6 @@
 #include <cassert>
 #include <string>
 
-#include <petsc_cpp/Petsc.hpp>
 
 namespace petsc
 {
@@ -78,21 +77,21 @@ class Matrix
 
     static type to_type( MatType t )
     {
-        if ( t == MATAIJ ) return type::aij;
-        if ( t == MATSEQAIJ ) return type::seq_aij;
-        if ( t == MATMPIAIJ ) return type::mpi_aij;
+        if ( std::strcmp( t, MATAIJ ) ) return type::aij;
+        if ( std::strcmp( t, MATSEQAIJ ) ) return type::seq_aij;
+        if ( std::strcmp( t, MATMPIAIJ ) ) return type::mpi_aij;
 
-        if ( t == MATBAIJ ) return type::block_aij;
-        if ( t == MATSEQBAIJ ) return type::seq_block_aij;
-        if ( t == MATMPIAIJ ) return type::mpi_block_aij;
+        if ( std::strcmp( t, MATBAIJ ) ) return type::block_aij;
+        if ( std::strcmp( t, MATSEQBAIJ ) ) return type::seq_block_aij;
+        if ( std::strcmp( t, MATMPIAIJ ) ) return type::mpi_block_aij;
 
-        if ( t == MATSBAIJ ) return type::symm_block_aij;
-        if ( t == MATSEQSBAIJ ) return type::seq_symm_block_aij;
-        if ( t == MATMPISBAIJ ) return type::mpi_symm_block_aij;
+        if ( std::strcmp( t, MATSBAIJ ) ) return type::symm_block_aij;
+        if ( std::strcmp( t, MATSEQSBAIJ ) ) return type::seq_symm_block_aij;
+        if ( std::strcmp( t, MATMPISBAIJ ) ) return type::mpi_symm_block_aij;
 
-        if ( t == MATDENSE ) return type::dense;
-        if ( t == MATSEQDENSE ) return type::seq_dense;
-        if ( t == MATMPIDENSE ) return type::mpi_dense;
+        if ( std::strcmp( t, MATDENSE ) ) return type::dense;
+        if ( std::strcmp( t, MATSEQDENSE ) ) return type::seq_dense;
+        if ( std::strcmp( t, MATMPIDENSE ) ) return type::mpi_dense;
 
         // if ( t == MATSHELL ) return type::shell;
 
@@ -119,20 +118,20 @@ class Matrix
     // non-square:
     Matrix( unsigned int N,
             unsigned int M,
-            const type t = type::block_aij,
+            const type t = type::aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : Matrix( t, comm )
     {
-        assert( N != M &&
-                ( t == type::symm_block_aij || t == type::seq_symm_block_aij ||
-                  t == type::mpi_symm_block_aij ) );
+        assert( N == M &&
+                !( t == type::symm_block_aij || t == type::seq_symm_block_aij ||
+                   t == type::mpi_symm_block_aij ) );
         MatSetSizes( m_, PETSC_DECIDE, PETSC_DECIDE, static_cast<int>( N ),
                      static_cast<int>( M ) );
     }
 
     // square:
     Matrix( unsigned int N,
-            const type t = type::block_aij,
+            const type t = type::aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : Matrix( N, N, t, comm )
     {
@@ -142,7 +141,7 @@ class Matrix
     Matrix( unsigned int N,
             unsigned int M,
             unsigned int block_size,
-            const type t = type::block_aij,
+            const type t = type::aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : Matrix( N, M, t, comm )
     {
@@ -153,7 +152,7 @@ class Matrix
     // assume that the matrix actually has a type... this should only be
     // used in the implementation, but might be used if I forgot a
     // function:
-    Matrix( Mat in ) : m_( in )
+    Matrix( Mat& in, bool owned = true ) : m_( in ), owned( owned )
     {
         MatType t;
         MatGetType( m_, &t );
@@ -170,17 +169,7 @@ class Matrix
     // rule of 4.5:
     Matrix( const Matrix& other )
     {
-        MatType t;
-        MatGetType( other.m_, &t );
-        if ( t ) {
-            mat_type = to_type( t );
-            has_type = true;
-        } else
-            has_type = false;
-        PetscBool b;
-        MatAssembled( other.m_, &b );
-        b == PETSC_TRUE ? assembled = true : assembled = false;
-        MatConvert( other.m_, MATSAME, MAT_INITIAL_MATRIX, &m_ );
+        MatDuplicate( other.m_, MAT_COPY_VALUES, &m_ );
     }
 
     Matrix( Matrix&& other )
@@ -191,13 +180,20 @@ class Matrix
     }
 
     // assignment operator:
-    Matrix& operator=( Matrix other );
+    Matrix& operator=( const Matrix& other );
+    Matrix& operator+=( const Vector& D );
+    Matrix& operator*=( const std::complex<double>& alpha );
+    Matrix& operator/=( const std::complex<double>& alpha );
+    Matrix& shallow_copy( const Matrix& a );
 
     // destructor:
-    ~Matrix() { MatDestroy( &m_ ); }
+    ~Matrix()
+    {
+        if ( owned ) MatDestroy( &m_ );
+    }
 
     // swap!
-    friend void swap( Matrix& first, Matrix& second ); // nothrow
+    friend void swap( Matrix& first, Matrix& second ) noexcept; // nothrow
 
     // modifiers:
     void set_type( const MatType t );
@@ -285,6 +281,7 @@ class Matrix
     // state:
     bool has_type{false};
     bool assembled{false};
+    bool owned{true};
     std::mutex l;
     type mat_type;
     friend class Vector;

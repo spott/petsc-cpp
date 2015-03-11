@@ -1,4 +1,6 @@
 #define SLEPC
+#include <slepc.h>
+
 
 #include <stdexcept>
 #include <petsc_cpp/Petsc.hpp>
@@ -23,12 +25,18 @@ void swap( EigenvalueSolver& first, EigenvalueSolver& second ) // nothrow
 
 MPI_Comm EigenvalueSolver::comm() const
 {
-    static MPI_Comm comm = [=]() {
-        MPI_Comm c;
-        PetscObjectGetComm( (PetscObject)e_, &c );
-        return c;
-    }();
-    return comm;
+    MPI_Comm c;
+    PetscObjectGetComm( (PetscObject)e_, &c );
+    return c;
+}
+
+int EigenvalueSolver::rank() const
+{
+    MPI_Comm c;
+    int rank;
+    PetscObjectGetComm( (PetscObject)e_, &c );
+    MPI_Comm_rank( c, &rank );
+    return rank;
 }
 
 
@@ -137,15 +145,19 @@ void EigenvalueSolver::print() const
 EigenvalueSolver::result EigenvalueSolver::get_eigenpair( int nev ) const
 {
     assert( nev < num_converged() );
-    auto v = op().get_right_vector();
-    PetscScalar ev;
-    EPSGetEigenpair( e_, nev, &ev, PETSC_NULL, v.v_, PETSC_NULL );
-    v.normalize_sign();
+    result r{nev, 0.0, op().get_right_vector()};
+    EPSGetEigenpair( e_, nev, &( r.evalue ), PETSC_NULL, r.evector.v_,
+                     PETSC_NULL );
+    r.evector.normalize_sign();
     if ( inner_product_space_mat != nullptr )
-        v /= std::sqrt( inner_product( v, *inner_product_space_mat, v ) );
+        r.evector /= std::sqrt(
+            inner_product( r.evector, *inner_product_space_mat, r.evector ) );
     else if ( inner_product_space_diag != nullptr )
-        v /= std::sqrt( inner_product( v, *inner_product_space_diag, v ) );
-    return result{nev, ev, v};
+        r.evector /= std::sqrt(
+            inner_product( r.evector, *inner_product_space_diag, r.evector ) );
+    else
+        std::cerr << "didn't renormalize eigenpair " << nev << std::endl;
+    return r;
 }
 
 PetscScalar EigenvalueSolver::get_eigenvalue( int nev ) const

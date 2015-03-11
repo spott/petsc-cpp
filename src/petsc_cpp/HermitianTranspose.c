@@ -29,8 +29,8 @@ PetscErrorCode MatMultAdd_HTranspose(Mat N,Vec v1,Vec v2,Vec v3)
 }
 
 #undef __FUNCT__
-#define __FUNCT__ "MatMultTranspose_HTranspose"
-PetscErrorCode MatMultTranspose_HTranspose(Mat N,Vec x,Vec y)
+#define __FUNCT__ "MatMultHTranspose_HTranspose"
+PetscErrorCode MatMultHTranspose_HTranspose(Mat N,Vec x,Vec y)
 {
   Mat_HTranspose  *Na = (Mat_HTranspose*)N->data;
   PetscErrorCode ierr;
@@ -41,8 +41,8 @@ PetscErrorCode MatMultTranspose_HTranspose(Mat N,Vec x,Vec y)
 }
 
 #undef __FUNCT__
-#define __FUNCT__ "MatMultTransposeAdd_HTranspose"
-PetscErrorCode MatMultTransposeAdd_HTranspose(Mat N,Vec v1,Vec v2,Vec v3)
+#define __FUNCT__ "MatMultHTransposeAdd_HTranspose"
+PetscErrorCode MatMultHTransposeAdd_HTranspose(Mat N,Vec v1,Vec v2,Vec v3)
 {
   Mat_HTranspose  *Na = (Mat_HTranspose*)N->data;
   PetscErrorCode ierr;
@@ -75,7 +75,9 @@ PetscErrorCode MatDuplicate_HTranspose(Mat N, MatDuplicateOption op, Mat* m)
   PetscFunctionBegin;
   //at the moment, this doesn't NOT copy values
   if (op == MAT_COPY_VALUES)
-    ierr = MatHermitianTranspose(N, MAT_INITIAL_MATRIX, m);
+    {
+      ierr = MatHermitianTranspose(N, MAT_INITIAL_MATRIX, m); CHKERRQ(ierr);
+    }
   else
     SETERRQ(PetscObjectComm((PetscObject)N),PETSC_ERR_ARG_SIZ,"Can't duplicate and not copy values");
   PetscFunctionReturn(0);
@@ -126,8 +128,10 @@ PetscErrorCode  MatCreateHTranspose(Mat A,Mat *N)
   (*N)->ops->destroy          = MatDestroy_HTranspose;
   (*N)->ops->mult             = MatMult_HTranspose;
   (*N)->ops->multadd          = MatMultAdd_HTranspose;
-  (*N)->ops->multtranspose    = MatMultTranspose_HTranspose;
-  (*N)->ops->multtransposeadd = MatMultTransposeAdd_HTranspose;
+  /* (*N)->ops->multtranspose    = MatMultTranspose_HTranspose; */
+  /* (*N)->ops->multtransposeadd = MatMultTransposeAdd_HTranspose; */
+  (*N)->ops->multhermitiantranspose    = MatMultHTranspose_HTranspose;
+  (*N)->ops->multhermitiantransposeadd    = MatMultHTransposeAdd_HTranspose;
   (*N)->ops->duplicate        = MatDuplicate_HTranspose;
   (*N)->assembled             = PETSC_TRUE;
 
