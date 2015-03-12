@@ -5,10 +5,19 @@
 #include <array>
 #include <mutex>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
 #include <petsc.h>
 #ifdef SLEPC
 #include <slepc.h>
 #endif
+#pragma clang diagnostic pop
+#pragma clang diagnostic pop
+#pragma clang diagnostic pop
 
 // forward definitions:
 namespace petsc
@@ -37,7 +46,7 @@ class PetscContext
                   std::string help )
     {
         int ac = argc;
-        char** av = new char* [argc + 1];
+        char** av = new char* [static_cast<size_t>( argc ) + 1];
         for ( int i = 0; i < argc; i++ ) {
             av[i] = new char[strlen( argv[i] ) + 1];
             std::copy( argv[i], argv[i] + strlen( argv[i] ) + 1, av[i] );
@@ -54,7 +63,7 @@ class PetscContext
     PetscContext( const int argc, const char** argv )
     {
         int ac = argc;
-        char** av = new char* [argc + 1];
+        char** av = new char* [static_cast<size_t>( argc ) + 1];
         for ( int i = 0; i < argc; i++ ) {
             av[i] = new char[strlen( argv[i] ) + 1];
             std::copy( argv[i], argv[i] + strlen( argv[i] ) + 1, av[i] );

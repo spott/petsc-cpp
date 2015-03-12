@@ -1,11 +1,11 @@
 PETSC_DIR=/usr/local/Cellar/petsc/3.5.3-debug
 SLEPC_DIR=/usr/local/Cellar/slepc/3.5.3-debug
-
 #include ${PETSC_DIR}/conf/variables
 #include ${PETSC_DIR}/conf/rules
 include ${SLEPC_DIR}/conf/slepc_common
 
-CPP_FLAGS=-I/Users/spott/Code/include/ -I/Users/spott/Code/libs/petsc-3.5.3/include/ -I./include/ -std=c++1y -Wall -Wpedantic -Werror
+CPP_ERRORS=-fdiagnostics-show-template-tree -Wall -Wpedantic -Wextra -Werror -Wbind-to-temporary-copy -Weverything -Wno-c++98-compat-pedantic -Wno-old-style-cast -Wno-error=padded
+CPP_FLAGS= -I/Users/spott/Code/libs/petsc-3.5.3/include/ -I./include/ -std=c++1y ${CPP_ERRORS}
 LDFLAGS=
 
 

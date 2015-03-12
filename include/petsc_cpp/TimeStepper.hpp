@@ -1,12 +1,6 @@
 #pragma once
 
-#include <petsc.h>
-#ifdef SLEPC
-#include <slepc.h>
-#endif
-
-#include <petsc_cpp/Vector.hpp>
-#include <petsc_cpp/Matrix.hpp>
+#include <petsc_cpp/Petsc.hpp>
 
 namespace petsc
 {
@@ -85,8 +79,8 @@ class TimeStepper
     }
 
 
-    explicit TimeStepper( TS& ts, bool owned = false )
-        : ts( ts ), owned( owned )
+    explicit TimeStepper( TS& ts_, bool owned_ = false )
+        : ts( ts_ ), owned( owned_ )
     {
     }
 
@@ -111,9 +105,9 @@ class TimeStepper
     void set_monitor( Mon m )
     {
         TSMonitorSet( ts,
-                      []( TS ts, int step, double t, Vec u, void* monitor ) {
-                          ( *(Mon*)monitor )( TimeStepper( ts, false ), step, t,
-                                              Vector( u, false ) );
+                      []( TS ts_, int step, double t, Vec u, void* monitor ) {
+                          ( *(Mon*)monitor )( TimeStepper( ts_, false ), step,
+                                              t, Vector( u, false ) );
                       },
                       &m, PETSC_NULL );
     }
