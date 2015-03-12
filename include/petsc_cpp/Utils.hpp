@@ -230,13 +230,13 @@ inline void export_vector_binary( const std::string& filename,
                                         ? out.end()
                                         : i + block_size );
                   j++ )
-                ni[j - i] = static_cast<T2>( *j );
+                ni[static_cast<size_t>( j - i )] = static_cast<T2>( *j );
             file.write(
                 reinterpret_cast<const char*>( &ni ),
-                static_cast<size_t>( sizeof( T2 ) *
-                                     ( ( out.end() - i < int( block_size ) )
-                                           ? out.end() - i
-                                           : block_size ) ) );
+                static_cast<std::streamsize>(
+                    sizeof( T2 ) * ( ( out.end() - i < int( block_size ) )
+                                         ? static_cast<size_t>( out.end() - i )
+                                         : block_size ) ) );
         }
         file.close();
     } else {
@@ -254,13 +254,13 @@ template <typename T>
 inline void to_void( T& )
 {
     return;
-};
+}
 
 template <typename T>
 inline T id( T& a )
 {
     return a;
-};
+}
 
 template <typename Scalar>
 inline Scalar from_complex( std::complex<double> a );

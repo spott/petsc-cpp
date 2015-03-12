@@ -86,6 +86,8 @@ class PetscContext
         return r;
     }
 
+    PetscContext(const PetscContext&) = delete;
+
     ~PetscContext()
     {
 #ifdef SLEPC
