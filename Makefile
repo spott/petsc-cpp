@@ -1,11 +1,9 @@
-PETSC_DIR=/usr/local/Cellar/petsc/3.5.3-debug
-SLEPC_DIR=/usr/local/Cellar/slepc/3.5.3-debug
-#include ${PETSC_DIR}/conf/variables
-#include ${PETSC_DIR}/conf/rules
 include ${SLEPC_DIR}/conf/slepc_common
 
-CPP_ERRORS=-fdiagnostics-show-template-tree -Wall -Wpedantic -Wextra -Werror -Wbind-to-temporary-copy -Weverything -Wno-c++98-compat-pedantic -Wno-old-style-cast -Wno-error=padded
-CPP_FLAGS= -I/Users/spott/Code/libs/petsc-3.5.3/include/ -I./include/ -std=c++1y ${CPP_ERRORS}
+
+RELEASE_FLAGS=-Wall -Wpedantic -Wextra
+DEBUG_FLAGS=-fdiagnostics-show-template-tree -Wall -Wpedantic -Wextra -Werror -Wbind-to-temporary-copy -Weverything -Wno-c++98-compat-pedantic -Wno-old-style-cast -Wno-error=padded
+CPP_FLAGS= -I${PRIVATE_PETSC_DIR}/include/ -I./include/ -std=c++1y
 LDFLAGS=
 
 
@@ -17,10 +15,20 @@ OBJECTS=$(SOURCES:.cpp=.o)
 COBJECT=$(CSOURCE:.c=.o)
 EXECUTABLE=test
 LIB=lib/libpetsc_cpp.a
-DEFAULT=all
+UNAME := $(shell uname)
+ifeq ($(UNAME), Linux)
+	DEFAULT=release
+endif
+ifeq ($(UNAME), Darwin)
+	DEFAULT=debug
+endif
 
-all: format $(EXECUTABLE) library
+debug: CPP_FLAGS += ${DEBUG_FLAGS}
+debug: format $(EXECUTABLE) library
 	echo "It compiles!  You should commit!"
+
+release: CPP_FLAGS += ${RELEASE_FLAGS}
+release: $(EXECUTABLE) library
 
 ${COBJECT}:
 	mpicc src/petsc_cpp/HermitianTranspose.c -o src/petsc_cpp/HermitianTranspose.o -c -I/Users/spott/Code/libs/petsc-3.5.3/include/ -I${PETSC_DIR}/include/

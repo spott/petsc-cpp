@@ -116,8 +116,8 @@ class Matrix
     }
 
     // non-square:
-    Matrix( unsigned int N,
-            unsigned int M,
+    Matrix( size_t N,
+            size_t M,
             const type t = type::aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : Matrix( t, comm )
@@ -130,7 +130,7 @@ class Matrix
     }
 
     // square:
-    Matrix( unsigned int N,
+    Matrix( size_t N,
             const type t = type::aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : Matrix( N, N, t, comm )
@@ -138,9 +138,9 @@ class Matrix
     }
 
     // non-square, blocked:
-    Matrix( unsigned int N,
-            unsigned int M,
-            unsigned int block_size,
+    Matrix( size_t N,
+            size_t M,
+            size_t block_size,
             const type t = type::aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : Matrix( N, M, t, comm )

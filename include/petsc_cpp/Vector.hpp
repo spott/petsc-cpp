@@ -47,7 +47,7 @@ class Vector
         VecCreate( comm, &v_ );
     }
 
-    Vector( int size,
+    Vector( size_t size,
             const type t = type::standard,
             MPI_Comm comm = PETSC_COMM_WORLD )
         : has_type( true ), assembled( false ), vec_type( t )
@@ -55,7 +55,7 @@ class Vector
         if ( t == type::seq ) comm = PETSC_COMM_SELF;
         VecCreate( comm, &v_ );
         VecSetType( v_, to_VecType( t ) );
-        VecSetSizes( v_, PETSC_DECIDE, size );
+        VecSetSizes( v_, PETSC_DECIDE, static_cast<int>( size ) );
     }
 
     Vector( std::unique_ptr<std::vector<std::complex<double>>> input,

@@ -37,7 +37,7 @@ class EigenvalueSolver
 
     EigenvalueSolver( Matrix& A,
                       Matrix& space,
-                      int dim,
+                      unsigned dim,
                       Which which_ = Which::smallest_real,
                       Type type = Type::hermitian )
         : op_( A ), inner_product_space_mat( &space ),
@@ -49,12 +49,13 @@ class EigenvalueSolver
         EPSCreate( A.comm(), &e_ );
         EPSSetOperators( e_, A.m_, PETSC_NULL );
         EPSSetProblemType( e_, static_cast<EPSProblemType>( type ) );
-        EPSSetDimensions( e_, dim, PETSC_DECIDE, PETSC_DECIDE );
+        EPSSetDimensions( e_, static_cast<int>( dim ), PETSC_DECIDE,
+                          PETSC_DECIDE );
         EPSSetWhichEigenpairs( e_, static_cast<EPSWhich>( which ) );
         EPSSetUp( e_ );
     }
     EigenvalueSolver( Matrix& A,
-                      int dim,
+                      unsigned dim,
                       Which which_ = Which::smallest_real,
                       Type type = Type::hermitian )
         : op_( A ), inner_product_space_mat( nullptr ),
@@ -65,7 +66,8 @@ class EigenvalueSolver
         EPSCreate( A.comm(), &e_ );
         EPSSetOperators( e_, A.m_, PETSC_NULL );
         EPSSetProblemType( e_, static_cast<EPSProblemType>( type ) );
-        EPSSetDimensions( e_, dim, PETSC_DECIDE, PETSC_DECIDE );
+        EPSSetDimensions( e_, static_cast<int>( dim ), PETSC_DECIDE,
+                          PETSC_DECIDE );
         EPSSetWhichEigenpairs( e_, static_cast<EPSWhich>( which ) );
         EPSSetUp( e_ );
     }
@@ -112,23 +114,23 @@ class EigenvalueSolver
 
     void dimensions( int nev, int mpd = -1, int ncv = -1 );
 
-    int iteration_number() const;
+    unsigned iteration_number() const;
 
-    std::array<int, 3> dimensions() const;
+    std::array<unsigned, 3> dimensions() const;
 
     std::tuple<PetscReal, PetscInt> tolerances() const;
     void tolerances( double tol, int iterations );
 
-    int num_converged() const;
+    unsigned num_converged() const;
 
     struct result {
-        result( int nev_, PetscScalar evalue_, Vector evector_ )
+        result( unsigned nev_, PetscScalar evalue_, Vector evector_ )
             : evalue( evalue_ ), evector( evector_ ), nev( nev_ )
         {
         }
         PetscScalar evalue;
         Vector evector;
-        int nev;
+        unsigned nev;
     };
 
     // print!:
@@ -141,17 +143,17 @@ class EigenvalueSolver
                          functional::to_void<Vector> ) const;
 
     // This version spits out a new vector:
-    EigenvalueSolver::result get_eigenpair( int nev ) const;
-    PetscScalar get_eigenvalue( int nev ) const;
+    EigenvalueSolver::result get_eigenpair( unsigned nev ) const;
+    PetscScalar get_eigenvalue( unsigned nev ) const;
 
     class Iterator : public std::iterator<std::random_access_iterator_tag,
                                           EigenvalueSolver::result>
     {
       public:
-        int nev;
+        unsigned nev;
         const EigenvalueSolver& e;
 
-        explicit Iterator( const int i, const EigenvalueSolver& es )
+        explicit Iterator( const unsigned i, const EigenvalueSolver& es )
             : nev( i ), e( es )
         {
         }
@@ -171,7 +173,7 @@ class EigenvalueSolver
         Iterator operator-( int n );
         Iterator operator+( int n );
 
-        Iterator::value_type operator[]( int n );
+        Iterator::value_type operator[]( unsigned n );
 
         bool operator>( const Iterator& rhs );
         bool operator<( const Iterator& rhs );
@@ -205,14 +207,14 @@ EigenvalueSolver::save_basis( const std::string& filename,
                               std::function<void(Vector&)> modification ) const
 {
     if ( num_converged() < 1 ) return;
-    if ( range[1] < 0 || range[1] > num_converged() )
-        range[1] = num_converged();
+    if ( range[1] < 0 || range[1] > static_cast<int>( num_converged() ) )
+        range[1] = static_cast<int>( num_converged() );
     assert( range[1] - range[0] != 0 );
 
     VecScatter scatter;
     Vec local;
     const PetscScalar* array;
-    PetscInt start, end;
+    PetscInt start_, end_;
     std::vector<Scalar> temp;
 
     {
@@ -229,11 +231,13 @@ EigenvalueSolver::save_basis( const std::string& filename,
         VecScatterEnd( scatter, b.v_, local, INSERT_VALUES, SCATTER_FORWARD );
 
         if ( !rank() ) {
-            VecGetOwnershipRange( local, &start, &end );
+            VecGetOwnershipRange( local, &start_, &end_ );
+            unsigned start = static_cast<unsigned>( start_ );
+            unsigned end = static_cast<unsigned>( end_ );
             assert( start == 0 );
             VecGetArrayRead( local, &array );
 
-            for ( int i = start; i < end; ++i ) {
+            for ( auto i = start; i < end; ++i ) {
                 temp.push_back(
                     functional::from_complex<Scalar>( array[i - start] ) );
             }

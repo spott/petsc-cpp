@@ -94,22 +94,26 @@ void EigenvalueSolver::dimensions( int nev, int mpd, int ncv )
     auto val = dimensions();
     if ( mpd == -1 ) mpd = PETSC_DECIDE;
     if ( ncv == -1 ) ncv = PETSC_DECIDE;
-    if ( nev == -1 ) nev = val[0];
+    if ( nev == -1 ) nev = static_cast<int>( val[0] );
 
     EPSSetDimensions( e_, nev, ncv, mpd );
 }
 
-int EigenvalueSolver::iteration_number() const
+unsigned int EigenvalueSolver::iteration_number() const
 {
     int its;
     EPSGetIterationNumber( e_, &its );
-    return its;
+    return static_cast<unsigned>( its );
 }
 
-std::array<int, 3> EigenvalueSolver::dimensions() const
+std::array<unsigned, 3> EigenvalueSolver::dimensions() const
 {
-    std::array<int, 3> out;
-    EPSGetDimensions( e_, &( out[0] ), &( out[1] ), &( out[2] ) );
+    std::array<int, 3> signed_out;
+    EPSGetDimensions( e_, &( signed_out[0] ), &( signed_out[1] ),
+                      &( signed_out[2] ) );
+    std::array<unsigned, 3> out{{static_cast<unsigned>( signed_out[0] ),
+                                 static_cast<unsigned>( signed_out[1] ),
+                                 static_cast<unsigned>( signed_out[2] )}};
     return out;
 }
 
@@ -126,11 +130,11 @@ void EigenvalueSolver::tolerances( double tol, int its )
     EPSSetTolerances( e_, tol, its );
 }
 
-int EigenvalueSolver::num_converged() const
+unsigned EigenvalueSolver::num_converged() const
 {
     int nconv;
     EPSGetConverged( e_, &nconv );
-    return nconv;
+    return static_cast<unsigned>( nconv );
 }
 
 void EigenvalueSolver::print() const
@@ -139,11 +143,12 @@ void EigenvalueSolver::print() const
 }
 
 
-EigenvalueSolver::result EigenvalueSolver::get_eigenpair( int nev ) const
+EigenvalueSolver::result EigenvalueSolver::get_eigenpair( unsigned nev ) const
 {
     assert( nev < num_converged() );
     result r{nev, 0.0, op().get_right_vector()};
-    EPSGetEigenpair( e_, nev, &( r.evalue ), PETSC_NULL, r.evector.v_,
+    int nev_signed = static_cast<int>( nev );
+    EPSGetEigenpair( e_, nev_signed, &( r.evalue ), PETSC_NULL, r.evector.v_,
                      PETSC_NULL );
     r.evector.normalize_sign();
     if ( inner_product_space_mat != nullptr )
@@ -153,15 +158,15 @@ EigenvalueSolver::result EigenvalueSolver::get_eigenpair( int nev ) const
         r.evector /= std::sqrt(
             inner_product( r.evector, *inner_product_space_diag, r.evector ) );
     else
-        std::cerr << "didn't renormalize eigenpair " << nev << std::endl;
+        std::cerr << "didn't renormalize eigenpair " << r.nev << std::endl;
     return r;
 }
 
-PetscScalar EigenvalueSolver::get_eigenvalue( int nev ) const
+PetscScalar EigenvalueSolver::get_eigenvalue( unsigned nev ) const
 {
     assert( nev < num_converged() );
     PetscScalar ev;
-    EPSGetEigenvalue( e_, nev, &ev, PETSC_NULL );
+    EPSGetEigenvalue( e_, static_cast<int>( nev ), &ev, PETSC_NULL );
     return ev;
 }
 
@@ -174,7 +179,6 @@ EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::operator++()
 
 EigenvalueSolver::Iterator EigenvalueSolver::Iterator::operator++( int )
 {
-    // assert( nev < e.num_converged()-1 );
     auto ret = *this;
     nev++;
     return ret;
@@ -183,21 +187,20 @@ EigenvalueSolver::Iterator EigenvalueSolver::Iterator::operator++( int )
 EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::
 operator+=( EigenvalueSolver::Iterator::difference_type diff )
 {
-
-    // assert( nev + diff < e.num_converged() && nev + diff >= 0 );
+    assert( diff > 0 || ( static_cast<difference_type>( nev ) >= -diff ) );
     nev += diff;
     return *this;
 }
 
 EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::operator--()
 {
-    // assert( nev > 0 );
+    assert( nev > 0 );
     nev--;
     return *this;
 }
 EigenvalueSolver::Iterator EigenvalueSolver::Iterator::operator--( int )
 {
-    // assert( nev > 0 );
+    assert( nev > 0 );
     auto ret = *this;
     nev--;
     return ret;
@@ -206,7 +209,7 @@ EigenvalueSolver::Iterator EigenvalueSolver::Iterator::operator--( int )
 EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::
 operator-=( EigenvalueSolver::Iterator::difference_type diff )
 {
-    // assert( nev - diff < e.num_converged() && nev - diff >= 0 );
+    assert( nev - diff < e.num_converged() && nev >= diff );
     nev -= diff;
     return *this;
 }
@@ -214,11 +217,13 @@ operator-=( EigenvalueSolver::Iterator::difference_type diff )
 EigenvalueSolver::Iterator::difference_type EigenvalueSolver::Iterator::
 operator-( const EigenvalueSolver::Iterator& other )
 {
+    assert( nev > other.nev );
     return nev - other.nev;
 }
 
 EigenvalueSolver::Iterator EigenvalueSolver::Iterator::operator-( int n )
 {
+    assert( ( n > 0 && static_cast<int>( nev ) >= n ) || n < 0 );
     EigenvalueSolver::Iterator ret{*this};
     ret -= n;
     return ret;
@@ -231,9 +236,8 @@ EigenvalueSolver::Iterator EigenvalueSolver::Iterator::operator+( int n )
 }
 
 EigenvalueSolver::Iterator::value_type EigenvalueSolver::Iterator::
-operator[]( int n )
+operator[]( unsigned n )
 {
-    // assert( n < e.num_converged() && n >= 0 );
     nev = n;
     return e.get_eigenpair( nev );
 }
@@ -267,7 +271,7 @@ operator<=( const EigenvalueSolver::Iterator& rhs )
 
 EigenvalueSolver::Iterator::value_type EigenvalueSolver::Iterator::operator*()
 {
-    if ( nev < 0 || nev >= e.num_converged() )
+    if ( nev >= e.num_converged() )
         throw std::out_of_range( "EigenvalueSolver::Iterator: attempting "
                                  "to dereference an iterator that is out "
                                  "of "
@@ -277,7 +281,7 @@ EigenvalueSolver::Iterator::value_type EigenvalueSolver::Iterator::operator*()
 std::unique_ptr<EigenvalueSolver::Iterator::value_type>
     EigenvalueSolver::Iterator::operator->()
 {
-    if ( nev < 0 || nev >= e.num_converged() )
+    if ( nev >= e.num_converged() )
         throw std::out_of_range( "EigenvalueSolver::Iterator: attempting "
                                  "to dereference an iterator "
                                  "that is out of range" );
@@ -299,6 +303,7 @@ EigenvalueSolver::result EigenvalueSolver::front()
 }
 EigenvalueSolver::result EigenvalueSolver::back()
 {
+    assert( num_converged() >= 1 );
     return get_eigenpair( num_converged() - 1 );
 }
 }
