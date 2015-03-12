@@ -7,6 +7,7 @@
 #include <vector>
 #include <cassert>
 #include <string>
+#include <cstring>
 
 
 namespace petsc
@@ -15,7 +16,7 @@ namespace petsc
 class Matrix
 {
   public:
-    enum class type {
+    enum class type : char {
         aij,
         mpi_aij,
         seq_aij,
@@ -69,10 +70,9 @@ class Matrix
                 return MATSEQDENSE;
             case type::mpi_dense:
                 return MATMPIDENSE;
-
-                // case type::shell:
-                // return MATSHELL;
         }
+
+        throw std::out_of_range( std::string( "type not supported " ) );
     }
 
     static type to_type( MatType t )
@@ -146,13 +146,13 @@ class Matrix
         : Matrix( N, M, t, comm )
     {
         assert( block_type( mat_type ) );
-        MatSetBlockSize( m_, block_size );
+        MatSetBlockSize( m_, static_cast<int>( block_size ) );
     }
 
     // assume that the matrix actually has a type... this should only be
     // used in the implementation, but might be used if I forgot a
     // function:
-    Matrix( Mat& in, bool owned = true ) : m_( in ), owned( owned )
+    Matrix( Mat& in, bool owned_ = true ) : m_( in ), owned( owned_ )
     {
         MatType t;
         MatGetType( m_, &t );
@@ -174,7 +174,7 @@ class Matrix
 
     Matrix( Matrix&& other )
         : m_( other.m_ ), has_type( other.has_type ),
-          assembled( other.assembled ), l(), mat_type( other.mat_type )
+          assembled( other.assembled ), mat_type( other.mat_type )
     {
         other.m_ = PETSC_NULL;
     }
@@ -214,7 +214,6 @@ class Matrix
     template <typename F>
     void reserve( F test )
     {
-        l.lock();
         MatSetUp( m_ );
 
 #pragma clang diagnostic push
@@ -242,7 +241,6 @@ class Matrix
         }
 #pragma clang diagnostic pop
         MatMPIAIJSetPreallocation( m_, 0, dnnz.data(), 0, onnz.data() );
-        l.unlock();
     }
 
     // assemble!
@@ -282,7 +280,6 @@ class Matrix
     bool has_type{false};
     bool assembled{false};
     bool owned{true};
-    std::mutex l;
     type mat_type;
     friend class Vector;
 };

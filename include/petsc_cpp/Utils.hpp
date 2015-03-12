@@ -148,10 +148,10 @@ inline void printProgBar( double percent, std::ostream& os = std::cout )
     percent *= 100;
     std::string bar;
 
-    for ( int i = 0; i < 50; i++ ) {
+    for ( size_t i = 0; i < 50; i++ ) {
         if ( i < ( percent / 2 ) ) {
             bar.replace( i, 1, "=" );
-        } else if ( i == ( int( percent ) / 2 ) ) {
+        } else if ( i == ( size_t( percent ) / 2 ) ) {
             bar.replace( i, 1, ">" );
         } else {
             bar.replace( i, 1, " " );
@@ -251,7 +251,7 @@ namespace functional
 {
 
 template <typename T>
-inline void to_void( T& a )
+inline void to_void( T& )
 {
     return;
 };

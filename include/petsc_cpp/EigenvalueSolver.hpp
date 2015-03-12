@@ -38,11 +38,11 @@ class EigenvalueSolver
     EigenvalueSolver( Matrix& A,
                       Matrix& space,
                       int dim,
-                      Which which = Which::smallest_real,
+                      Which which_ = Which::smallest_real,
                       Type type = Type::hermitian )
         : op_( A ), inner_product_space_mat( &space ),
           inner_product_space_diag( nullptr ), problem_type( type ),
-          which( which )
+          which( which_ )
     {
         assert( type == Type::hermitian || type == Type::nonhermitian );
         assert( space.comm() == A.comm() );
@@ -55,11 +55,11 @@ class EigenvalueSolver
     }
     EigenvalueSolver( Matrix& A,
                       int dim,
-                      Which which = Which::smallest_real,
+                      Which which_ = Which::smallest_real,
                       Type type = Type::hermitian )
         : op_( A ), inner_product_space_mat( nullptr ),
           inner_product_space_diag( nullptr ), problem_type( type ),
-          which( which )
+          which( which_ )
     {
         assert( type == Type::hermitian || type == Type::nonhermitian );
         EPSCreate( A.comm(), &e_ );
@@ -122,9 +122,13 @@ class EigenvalueSolver
     int num_converged() const;
 
     struct result {
-        int nev;
+        result( int nev_, PetscScalar evalue_, Vector evector_ )
+            : evalue( evalue_ ), evector( evector_ ), nev( nev_ )
+        {
+        }
         PetscScalar evalue;
         Vector evector;
+        int nev;
     };
 
     // print!:
@@ -152,11 +156,9 @@ class EigenvalueSolver
         {
         }
 
-        Iterator( const Iterator& i ) : nev( i.nev ), e( i.e ){};
+        Iterator( const Iterator& i ) : nev( i.nev ), e( i.e ) {}
 
         Iterator( Iterator&& i ) : nev( i.nev ), e( i.e ) {}
-
-        Iterator& operator=( Iterator rhs );
 
         Iterator& operator++();
         Iterator operator++( int );

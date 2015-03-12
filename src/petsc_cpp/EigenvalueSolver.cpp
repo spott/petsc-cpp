@@ -1,7 +1,4 @@
 #define SLEPC
-#include <slepc.h>
-
-
 #include <stdexcept>
 #include <petsc_cpp/Petsc.hpp>
 #include <petsc_cpp/EigenvalueSolver.hpp>
@@ -166,14 +163,6 @@ PetscScalar EigenvalueSolver::get_eigenvalue( int nev ) const
     PetscScalar ev;
     EPSGetEigenvalue( e_, nev, &ev, PETSC_NULL );
     return ev;
-}
-
-
-EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::
-operator=( Iterator rhs )
-{
-    *this = EigenvalueSolver::Iterator( rhs.nev, rhs.e );
-    return *this;
 }
 
 EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::operator++()

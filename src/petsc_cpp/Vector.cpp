@@ -18,20 +18,16 @@ void swap( Vector& first, Vector& second ) // nothrow
 // set value:
 void Vector::set_value( const int n, PetscScalar v )
 {
-    l.lock();
     VecSetValue( v_, n, v, INSERT_VALUES );
     assembled = false;
-    l.unlock();
 }
 
 // assemble:
 void Vector::assemble()
 {
-    l.lock();
     VecAssemblyBegin( v_ );
     VecAssemblyEnd( v_ );
     assembled = true;
-    l.unlock();
 }
 
 Vector& Vector::conjugate()
@@ -173,8 +169,8 @@ void Vector::draw( const std::vector<Vector>& vectors,
         PetscDrawLG lg;
 
 
-        PetscViewerDrawGetDraw( viewer, i, &draw );
-        PetscViewerDrawGetDrawLG( viewer, i, &lg );
+        PetscViewerDrawGetDraw( viewer, static_cast<int>( i ), &draw );
+        PetscViewerDrawGetDrawLG( viewer, static_cast<int>( i ), &lg );
         PetscDrawSetTitle( draw, ( "Vector " + std::to_string( i ) ).c_str() );
         PetscDrawSetDoubleBuffer( draw );
         PetscDrawLGSetDimension( lg, 2 );
@@ -184,7 +180,7 @@ void Vector::draw( const std::vector<Vector>& vectors,
         else
             PetscDrawLGSetLimits( lg, 0, vectors[i].size(), -1, 1 );
         const PetscScalar* array;
-        PetscInt start, end;
+        PetscInt start_, end_;
         // TODO: Need to scatter array first
         VecScatterBegin( scatter, vectors[i].v_, local, INSERT_VALUES,
                          SCATTER_FORWARD );
@@ -192,15 +188,17 @@ void Vector::draw( const std::vector<Vector>& vectors,
                        SCATTER_FORWARD );
         VecGetArrayRead( local, &array );
         if ( !vectors[0].rank() ) {
-            VecGetOwnershipRange( local, &start, &end );
+            VecGetOwnershipRange( local, &start_, &end_ );
+            size_t start = static_cast<size_t>( start_ );
+            size_t end = static_cast<size_t>( end_ );
 
-            for ( int i = 0; i < end - start; ++i ) {
-                PetscReal x[2] = {double( i + start ), double( i + start )};
+            for ( auto j = 0u; j < end - start; ++j ) {
+                PetscReal x[2] = {double( j + start ), double( j + start )};
                 if ( v != nullptr ) {
-                    x[0] = ( *v )[i];
-                    x[1] = ( *v )[i];
+                    x[0] = ( *v )[j];
+                    x[1] = ( *v )[j];
                 }
-                PetscReal y[2] = {array[i].real(), 10. * array[i].imag()};
+                PetscReal y[2] = {array[j].real(), 10. * array[j].imag()};
                 PetscDrawLGAddPoint( lg, x, y );
             }
             VecRestoreArrayRead( vectors[i].v_, &array );
@@ -232,12 +230,14 @@ void Vector::draw( const std::vector<double>* v ) const
         PetscDrawLGSetLimits( lg, 0, this->size(), -1, 1 );
 
     const PetscScalar* array;
-    PetscInt start, end;
+    PetscInt start_, end_;
     // TODO: Need to scatter array first
     VecGetArrayRead( v_, &array );
-    VecGetOwnershipRange( v_, &start, &end );
+    VecGetOwnershipRange( v_, &start_, &end_ );
+    size_t start = static_cast<size_t>( start_ );
+    size_t end = static_cast<size_t>( end_ );
 
-    for ( int i = 0; i < end - start; ++i ) {
+    for ( auto i = 0u; i < end - start; ++i ) {
         PetscReal x[2] = {double( i + start ), double( i + start )};
         if ( v != nullptr ) {
             x[0] = ( *v )[i];

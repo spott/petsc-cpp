@@ -6,6 +6,7 @@
 #include <mutex>
 #include <vector>
 #include <cassert>
+#include <cstring>
 
 
 namespace petsc
@@ -14,14 +15,7 @@ class Vector
 {
 
   public:
-    enum class type {
-        seq,
-        mpi,
-        standard
-        //#define VECSEQ         "seq"
-        //#define VECMPI         "mpi"
-        //#define VECSTANDARD    "standard"
-    };
+    enum class type : char { seq, mpi, standard };
 
   private:
     static VecType to_VecType( type t )
@@ -66,15 +60,18 @@ class Vector
 
     Vector( std::unique_ptr<std::vector<std::complex<double>>> input,
             const type t = type::seq )
-        : has_type( true ), assembled( true ), vec_type( t ),
-          data( std::move( input ) )
+        : data( std::move( input ) ), has_type( true ), assembled( true ),
+          vec_type( t )
+
     {
         assert( t != type::standard );
         if ( t == type::seq )
-            VecCreateSeqWithArray( PETSC_COMM_SELF, 1, this->data->size(),
+            VecCreateSeqWithArray( PETSC_COMM_SELF, 1,
+                                   static_cast<int>( this->data->size() ),
                                    this->data->data(), &v_ );
         if ( t == type::mpi )
-            VecCreateMPIWithArray( PETSC_COMM_WORLD, 1, this->data->size(),
+            VecCreateMPIWithArray( PETSC_COMM_WORLD, 1,
+                                   static_cast<int>( this->data->size() ),
                                    PETSC_DECIDE, this->data->data(), &v_ );
         assemble();
     }
@@ -86,9 +83,11 @@ class Vector
     {
         assert( t != type::standard );
         if ( t == type::seq )
-            VecCreateSeqWithArray( PETSC_COMM_SELF, 1, size, input, &v_ );
+            VecCreateSeqWithArray( PETSC_COMM_SELF, 1, static_cast<int>( size ),
+                                   input, &v_ );
         if ( t == type::mpi )
-            VecCreateMPIWithArray( PETSC_COMM_WORLD, 1, size, PETSC_DECIDE,
+            VecCreateMPIWithArray( PETSC_COMM_WORLD, 1,
+                                   static_cast<int>( size ), PETSC_DECIDE,
                                    input, &v_ );
         assemble();
     }
@@ -107,9 +106,9 @@ class Vector
 
     // move constructor:
     Vector( Vector&& other )
-        : v_( other.v_ ), has_type( other.has_type ),
-          assembled( other.assembled ), vec_type( other.vec_type ), l(),
-          data( std::move( other.data ) )
+        : v_( other.v_ ), data( std::move( other.data ) ),
+          has_type( other.has_type ), assembled( other.assembled ),
+          vec_type( other.vec_type )
     {
         other.v_ = PETSC_NULL;
     }
@@ -118,8 +117,8 @@ class Vector
     // used in
     // the implementation, but might be used if
     // I forgot a function;
-    Vector( Vec& in, bool owned = true )
-        : v_( in ), assembled( true ), owned( owned )
+    Vector( Vec& in, bool owned_ = true )
+        : v_( in ), assembled( true ), owned( owned_ )
     {
         VecType t;
         VecGetType( v_, &t );
@@ -195,12 +194,11 @@ class Vector
 
   private:
     // state:
+    std::unique_ptr<std::vector<std::complex<double>>> data;
     bool has_type;
     bool assembled;
     bool owned{true};
     type vec_type;
-    std::mutex l;
-    std::unique_ptr<std::vector<std::complex<double>>> data;
 
     friend class Matrix;
 };

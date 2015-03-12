@@ -21,19 +21,19 @@ int main( int argc, const char** argv )
                             return i == j || i == j + 1 || i == j + 2 ||
                                    i == j - 1 || i == j - 2;
                         },
-                     []( int i, int j ) { return 1; } );
+                     []( int, int ) { return 1; } );
     m.assemble();
     m.print();
 
     auto t1 = std::thread( petsc::populate_matrix, std::ref( m ),
                            []( int i, int j ) { return i == j; },
-                           []( int i, int j ) { return i; }, true );
+                           []( int i, int ) { return i; }, true );
     auto t2 = std::thread( petsc::populate_matrix, std::ref( m ),
                            []( int i, int j ) { return i == j - 1; },
-                           []( int i, int j ) { return 2; }, true );
+                           []( int, int ) { return 2; }, true );
     auto t3 = std::thread( petsc::populate_matrix, std::ref( m ),
                            []( int i, int j ) { return i == j - 2; },
-                           []( int i, int j ) { return -2; }, true );
+                           []( int, int ) { return -2; }, true );
 
     t1.join();
     t2.join();

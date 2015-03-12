@@ -35,17 +35,13 @@ void swap( Matrix& first, Matrix& second ) noexcept
 // modifiers:
 void Matrix::set_type( const MatType t )
 {
-    l.lock();
     MatSetType( m_, t );
     has_type = true;
-    l.unlock();
 }
 
 void Matrix::set_option( const MatOption o, bool b )
 {
-    l.lock();
     MatSetOption( m_, o, b ? PETSC_TRUE : PETSC_FALSE );
-    l.unlock();
 }
 
 void Matrix::set_size( const int n_global,
@@ -55,54 +51,40 @@ void Matrix::set_size( const int n_global,
                        const int n_block,
                        const int m_block )
 {
-    l.lock();
     MatSetSizes( m_, n_local, m_local, n_global, m_global );
     if ( block_type( mat_type ) && n_block != m_block )
         MatSetBlockSizes( m_, n_block, m_block );
     else if ( block_type( mat_type ) && n_block != 1 )
         MatSetBlockSize( m_, n_block );
-    l.unlock();
 }
 
 // set value:
 void Matrix::set_value( const int n, const int m, PetscScalar v )
 {
-    l.lock();
     MatSetValues( m_, 1, &n, 1, &m, &v, INSERT_VALUES );
     assembled = false;
-    l.unlock();
 }
 
 // assemble!
 void Matrix::assemble()
 {
-    l.lock();
     MatAssemblyBegin( m_, MAT_FINAL_ASSEMBLY );
     MatAssemblyEnd( m_, MAT_FINAL_ASSEMBLY );
     assembled = true;
-    l.unlock();
 }
 
 // getters:
 MPI_Comm Matrix::comm() const
 {
-    static MPI_Comm comm = [=]() {
-        MPI_Comm c;
-        PetscObjectGetComm( (PetscObject)m_, &c );
-        return c;
-    }();
-    return comm;
+    MPI_Comm c;
+    PetscObjectGetComm( (PetscObject)m_, &c );
+    return c;
 }
 
 int Matrix::rank() const
 {
-    static int rank = [=]() {
-        MPI_Comm c;
-        int rank;
-        PetscObjectGetComm( (PetscObject)m_, &c );
-        MPI_Comm_rank( c, &rank );
-        return rank;
-    }();
+    int rank;
+    MPI_Comm_rank( comm(), &rank );
     return rank;
 }
 
