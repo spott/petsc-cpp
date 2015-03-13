@@ -9,14 +9,20 @@ namespace petsc
 // assignment operator:
 Matrix& Matrix::operator=( const Matrix& other )
 {
-    assert( other.assembled && assembled );
-    // assumption here that they have the same nonzero patter... this could
-    // definitely be wrong.
-    if ( mat_type == other.mat_type )
-        MatCopy( other.m_, m_, SAME_NONZERO_PATTERN );
-    else {
+    assert( other.assembled );
+    if ( other.assembled && assembled ) {
+        if ( mat_type == other.mat_type )
+            // assumption here that they have the same nonzero patter... this
+            // could definitely be wrong.
+            MatCopy( other.m_, m_, SAME_NONZERO_PATTERN );
+        else {
+            MatDestroy( &m_ );
+            MatConvert( other.m_, to_MatType( mat_type ), MAT_INITIAL_MATRIX,
+                        &m_ );
+        }
+    } else if ( other.assembled ) {
         MatDestroy( &m_ );
-        MatConvert( other.m_, to_MatType( mat_type ), MAT_INITIAL_MATRIX, &m_ );
+        MatDuplicate( other.m_, MAT_COPY_VALUES, &m_ );
     }
     return *this;
 }
