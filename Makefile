@@ -10,7 +10,7 @@ LDFLAGS=
 
 CSOURCE=src/petsc_cpp/HermitianTranspose.c
 CHEADER=include/petsc_cpp/HermitianTranspose.h
-SOURCES=src/petsc_cpp/Matrix.cpp src/petsc_cpp/Vector.cpp src/petsc_cpp/EigenvalueSolver.cpp src/petsc_cpp/Utils.cpp test.cpp
+SOURCES=src/petsc_cpp/Matrix.cpp src/petsc_cpp/Vector.cpp src/petsc_cpp/EigenvalueSolver.cpp src/petsc_cpp/Utils.cpp test.cpp src/petsc_cpp/Draw.cpp
 HEADERS=include/petsc_cpp/Matrix.hpp include/petsc_cpp/Vector.hpp include/petsc_cpp/Petsc.hpp include/petsc_cpp/Utils.hpp include/petsc_cpp/EigenvalueSolver.hpp include/petsc_cpp/TimeStepper.hpp
 OBJECTS=$(SOURCES:.cpp=.o)
 COBJECT=$(CSOURCE:.c=.o)
