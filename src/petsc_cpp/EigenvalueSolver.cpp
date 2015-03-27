@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include <petsc_cpp/Petsc.hpp>
 #include <petsc_cpp/EigenvalueSolver.hpp>
-
+#include <slepc-private/epsimpl.h>
 
 namespace petsc
 {
@@ -12,7 +12,6 @@ void swap( EigenvalueSolver& first, EigenvalueSolver& second ) // nothrow
     using std::swap;
 
     swap( first.e_, second.e_ );
-    swap( first.op_, second.op_ );
     swap( first.problem_type, second.problem_type );
     swap( first.which, second.which );
     swap( first.inner_product_space_mat, second.inner_product_space_mat );
@@ -37,15 +36,19 @@ int EigenvalueSolver::rank() const
 }
 
 
-Matrix& EigenvalueSolver::op() const { return op_; }
-Matrix& EigenvalueSolver::op( Matrix& A )
+Matrix EigenvalueSolver::op() const
+{
+    Mat A;
+    EPSGetOperators( e_, &A, NULL );
+    return Matrix( A, false );
+}
+const Matrix& EigenvalueSolver::op( const Matrix& A )
 {
     EPSSetOperators( e_, A.m_, NULL );
     // EPSSetProblemType( e_, static_cast<EPSProblemType>( problem_type ) );
     // EPSSetWhichEigenpairs( e_, static_cast<EPSWhich>( which ) );
     // EPSSetUp(e_);
-    assert( &A == &op_ );
-    return op_;
+    return A;
 }
 
 void EigenvalueSolver::inner_product_space( Matrix&& B )
@@ -74,6 +77,22 @@ void EigenvalueSolver::solve()
 void EigenvalueSolver::set_initial_vector( Vector init )
 {
     EPSSetInitialSpace( e_, 1, &init.v_ );
+}
+
+void EigenvalueSolver::set_initial_vectors( std::vector<Vector> init )
+{
+    Vec* vs = new Vec[init.size()];
+    for ( auto i = 0u; i < init.size(); ++i ) vs[i] = init[i].v_;
+    EPSSetInitialSpace( e_, static_cast<int>( init.size() ), vs );
+    delete[] vs;
+}
+
+void EigenvalueSolver::set_deflation_space( std::vector<Vector> init )
+{
+    Vec* vs = new Vec[init.size()];
+    for ( auto i = 0u; i < init.size(); ++i ) vs[i] = init[i].v_;
+    EPSSetDeflationSpace( e_, static_cast<int>( init.size() ), vs );
+    delete[] vs;
 }
 
 void EigenvalueSolver::balance( EPSBalance bal, int iter, double cutoff )
@@ -150,15 +169,17 @@ EigenvalueSolver::result EigenvalueSolver::get_eigenpair( unsigned nev ) const
     int nev_signed = static_cast<int>( nev );
     EPSGetEigenpair( e_, nev_signed, &( r.evalue ), PETSC_NULL, r.evector.v_,
                      PETSC_NULL );
-    r.evector.normalize_sign();
-    if ( inner_product_space_mat != nullptr )
-        r.evector /= std::sqrt(
-            inner_product( r.evector, *inner_product_space_mat, r.evector ) );
-    else if ( inner_product_space_diag != nullptr )
-        r.evector /= std::sqrt(
-            inner_product( r.evector, *inner_product_space_diag, r.evector ) );
-    else
-        std::cerr << "didn't renormalize eigenpair " << r.nev << std::endl;
+    // r.evector.normalize_sign();
+    // if ( inner_product_space_mat != nullptr )
+    //     r.evector /= std::sqrt(
+    //         inner_product( r.evector, *inner_product_space_mat, r.evector )
+    //         );
+    // else if ( inner_product_space_diag != nullptr )
+    //     r.evector /= std::sqrt(
+    //         inner_product( r.evector, *inner_product_space_diag, r.evector )
+    //         );
+    // else
+    //     std::cerr << "didn't renormalize eigenpair " << r.nev << std::endl;
     return r;
 }
 
@@ -168,6 +189,32 @@ PetscScalar EigenvalueSolver::get_eigenvalue( unsigned nev ) const
     PetscScalar ev;
     EPSGetEigenvalue( e_, static_cast<int>( nev ), &ev, PETSC_NULL );
     return ev;
+}
+
+Vector EigenvalueSolver::get_eigenvector( unsigned nev )
+{
+    assert( nev < num_converged() );
+
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
+    EPSCheckSolved( e_, 1 );
+#pragma clang diagnostic pop
+
+    if ( e_->state == EPS_STATE_SOLVED && e_->ops->computevectors )
+        ( *e_->ops->computevectors )( e_ );
+    e_->state = EPS_STATE_EIGENVECTORS;
+
+    PetscInt k;
+    Vec v;
+
+    if ( !e_->perm )
+        k = static_cast<int>( nev );
+    else
+        k = e_->perm[nev];
+    BVGetColumn( ( e_->V ), k, &v );
+    return Vector(
+        v, [ bv = e_->V, k ]( Vec vv ) { BVRestoreColumn( bv, k, &vv ); } );
 }
 
 EigenvalueSolver::Iterator& EigenvalueSolver::Iterator::operator++()
@@ -217,7 +264,7 @@ operator-=( EigenvalueSolver::Iterator::difference_type diff )
 EigenvalueSolver::Iterator::difference_type EigenvalueSolver::Iterator::
 operator-( const EigenvalueSolver::Iterator& other )
 {
-    assert( nev > other.nev );
+    assert( nev >= other.nev );
     return nev - other.nev;
 }
 

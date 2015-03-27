@@ -22,9 +22,11 @@ void Draw::draw_point( double* xvalues, double* yvalues )
     if ( f )
         for ( unsigned i = 0; i < dim; ++i )
             yvalues[i] = ( *f )( yvalues[i], current_point );
-    PetscDrawLGAddPoint( lg, xvalues, yvalues );
+    if ( !rank() ) {
+        PetscDrawLGAddPoint( lg, xvalues, yvalues );
+        PetscDrawLGDraw( lg );
+    }
     current_point++;
-    PetscDrawLGDraw( lg );
 }
 void Draw::draw_point( double* yvalues )
 {
@@ -39,9 +41,11 @@ void Draw::draw_point( double* yvalues )
     else
         for ( unsigned i = 0u; i < dim; ++i )
             xvalues[i] = double( current_point );
-    PetscDrawLGAddPoint( lg, xvalues, yvalues );
+    if ( !rank() ) {
+        PetscDrawLGAddPoint( lg, xvalues, yvalues );
+        PetscDrawLGDraw( lg );
+    }
     current_point++;
-    PetscDrawLGDraw( lg );
     delete[] xvalues;
 }
 
@@ -92,7 +96,7 @@ void Draw::draw_vector( const std::vector<Vector>& v )
     assert( dim % 2 == 0 );
     this->reset();
     VecScatter scatter;
-    Vec local = new Vec[dim / 2];
+    Vec* local = new Vec[dim / 2];
     VecScatterCreateToZero( v[0].v_, &scatter, &local[0] );
 
     for ( unsigned i = 0u; i < dim / 2; ++i ) {
@@ -102,12 +106,12 @@ void Draw::draw_vector( const std::vector<Vector>& v )
                        SCATTER_FORWARD );
     }
     if ( !rank() ) {
-        const PetscScalar** array = new PetscScalar* [dim / 2];
-        PetscInt start_, end_;
+        const PetscScalar** array = new const PetscScalar* [dim / 2];
+        PetscInt start_ = 0, end_ = 0;
         for ( unsigned i = 0u; i < dim / 2; ++i ) {
             int s, e;
-            VecGetArrayRead( local, &array[i] );
-            VecGetOwnershipRange( local, &s, &e );
+            VecGetArrayRead( local[i], &array[i] );
+            VecGetOwnershipRange( local[i], &s, &e );
             if ( i == 0 ) {
                 start_ = s;
                 end_ = e;

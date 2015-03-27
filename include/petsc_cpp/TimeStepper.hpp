@@ -33,8 +33,8 @@ class TimeStepper
 
     enum class problem_type { linear = TS_LINEAR, nonlinear = TS_NONLINEAR };
 
-    struct time {
-        double t0, tf, dt;
+    struct times {
+        double ti, tf, dt;
     };
 
     TimeStepper( problem_type type,
@@ -50,32 +50,31 @@ class TimeStepper
     // Jac has approximate type (Vector& u, Matrix& A, Matrix& B, TimeStepper&
     // ts, double time)
     template <typename Jac>
-    TimeStepper( Jac G_u,
-                 Matrix& A,
-                 time t,
-                 TSType solver_type,
-                 const MPI_Comm& comm = PETSC_COMM_WORLD )
-        : TimeStepper( problem_type::linear, solver_type, comm )
+    TimeStepper( Jac G_u, Matrix& A, times t, TSType solver_type)
+        : TimeStepper( problem_type::linear, solver_type, A.comm() )
     {
-        assert( A.comm() == comm );
-        TSSetInitialTimeStep( ts, t.t0, t.dt );
-        // TSSetSolution( ts, solution.v_ );
-        TSSetDuration( ts, static_cast<int>( ( t.tf - t.t0 ) / t.dt ) + 10,
+        static Jac G_u_ = G_u;
+        TSSetInitialTimeStep( ts, t.ti, t.dt );
+        TSSetDuration( ts, static_cast<int>( ( t.tf - t.ti ) / t.dt ) + 10,
                        t.tf );
-        TSSetFromOptions( ts );
-
         TSSetRHSFunction( ts, NULL, TSComputeRHSFunctionLinear, NULL );
         TSSetRHSJacobian( ts, A.m_, A.m_,
-                          TimeStepper::RHSJacobian_function<Jac>, &G_u );
+                          TimeStepper::RHSJacobian_function<Jac>, &G_u_ );
     }
 
-    template <typename Jac>
-    static PetscErrorCode
-    RHSJacobian_function( TS ts, double t_, Vec u, Mat A, Mat B, void* G_u )
+    template <typename Jac, typename RHS>
+    TimeStepper( Jac G_u, RHS G, Matrix& A, times t, TSType solver_type)
+        : TimeStepper( problem_type::nonlinear, solver_type, A.comm() )
     {
-        ( *(Jac*)G_u )( Vector( u, false ), Matrix( A, false ),
-                        Matrix( B, false ), TimeStepper( ts, false ), t_ );
-        return 0;
+        static Jac G_u_ = G_u;
+        static RHS G_ = G;
+        TSSetInitialTimeStep( ts, t.ti, t.dt );
+        TSSetDuration( ts, static_cast<int>( ( t.tf - t.ti ) / t.dt ) + 10,
+                       t.tf );
+        TSSetRHSFunction( ts, NULL, TimeStepper::RHS_function<RHS>, &G_ );
+
+        TSSetRHSJacobian( ts, A.m_, A.m_,
+                          TimeStepper::RHSJacobian_function<Jac>, &G_u_ );
     }
 
 
@@ -94,22 +93,87 @@ class TimeStepper
 
     ~TimeStepper()
     {
-        if ( !owned ) TSDestroy( &ts );
+        if ( owned ) TSDestroy( &ts );
     }
 
-    void solve( Vector& u_0 ) { TSSolve( ts, u_0.v_ ); }
+    void solve( Vector& u_0 ) {
+        TSSetFromOptions( ts );
+        TSSolve( ts, u_0.v_ ); }
 
     void print() const { TSView( ts, PETSC_VIEWER_STDOUT_WORLD ); }
+
+    double time() const {
+        double t;
+        TSGetTime(ts, &t);
+        return t;
+    }
+    
+    unsigned step() const {
+        int t;
+        TSGetTimeStepNumber(ts, &t);
+        return static_cast<unsigned>(t);
+    }
+
+    double dt() const {
+        double dt;
+        TSGetTimeStep(ts, &dt);
+        return dt;
+    }
+
+    // void retain_stages(bool flg) {
+    //     TSSetRetainStages(ts, flg ? PETSC_TRUE : PETSC_FALSE);
+    // }
+
+    Vector interpolate(double t) const {
+        auto U = this->solution().duplicate();
+        TSInterpolate(ts, t, U.v_);
+        return U;
+    }
+
+    Vector solution() const {
+        Vec U;
+        TSGetSolution(ts, &U);
+        return Vector(U, Vector::owner::other);
+    }
 
     template <typename Mon>
     void set_monitor( Mon m )
     {
-        TSMonitorSet( ts,
-                      []( TS ts_, int step, double t, Vec u, void* monitor ) {
-                          ( *(Mon*)monitor )( TimeStepper( ts_, false ), step,
-                                              t, Vector( u, false ) );
-                      },
-                      &m, PETSC_NULL );
+        static Mon m_ = m;
+        TSMonitorSet( ts, TimeStepper::Monitor_function<Mon>, &m_, NULL );
+    }
+
+    template <typename Mon>
+    static PetscErrorCode
+    Monitor_function( TS ts_, int step, double t, Vec u, void* monitor )
+    {
+        TimeStepper T( ts_, false );
+        Vector U( u, Vector::owner::other );
+        ( *(Mon*)monitor )( T, step, t, U );
+        return 0;
+    }
+
+    template <typename Jac>
+    static PetscErrorCode
+    RHSJacobian_function( TS ts, double t_, Vec u, Mat A, Mat B, void* G_u )
+    {
+        Vector U( u, Vector::owner::other );
+        Matrix AA( A, false );
+        Matrix BB( B, false );
+        TimeStepper T( ts, false );
+        ( *(Jac*)G_u )( U, AA, BB, T, t_ );
+        return 0;
+    }
+
+    template <typename RHS>
+    static PetscErrorCode
+    RHS_function( TS ts, double t_, Vec u, Vec f, void* G )
+    {
+        Vector U( u, Vector::owner::other );
+        Vector F( f, Vector::owner::other );
+        TimeStepper T( ts, false );
+        ( *(RHS*)G )( U, F, T, t_ );
+        return 0;
     }
 
     TS ts;

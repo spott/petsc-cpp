@@ -1,63 +1,60 @@
-include ${SLEPC_DIR}/conf/slepc_common
+include ${SLEPC_DIR}/lib/slepc-conf/slepc_variables
 
 
-RELEASE_FLAGS=-Wall -Wpedantic -Wextra
-CLANG_ONLY_FLAGS=-fdiagnostics-show-template-tree -Wbind-to-temporary-copy -Weverything -D_DEBUG
-DEBUG_FLAGS=-Wall -Wpedantic -Wextra -Werror -Wno-c++98-compat-pedantic -Wno-old-style-cast -Wno-error=padded
-CPP_FLAGS_= -I${PRIVATE_PETSC_DIR}/include/ -I./include/ -std=c++1y
-LDFLAGS=
+release_cpp_flags = -Wall -Wpedantic -Wextra
+clang_cpp_flags   = -fdiagnostics-show-template-tree -Wbind-to-temporary-copy -Weverything -D_DEBUG
+debug_cpp_flags   = ${release_cpp_flags} -Werror -Wno-c++98-compat-pedantic \
+					          -Wno-old-style-cast -Wno-padded -Wno-deprecated-declarations
+CPP_FLAGS         = -I./include/ -std=c++1y ${SLEPC_CC_INCLUDES} ${PETSC_CC_INCLUDES}
+LD_FLAGS          = ${SLEPC_LIB} ${PETSC_LIB}
+
+#Directories:
+source   = ./src/petsc_cpp
+includes = ./include/petsc_cpp
+build    = ./build
+
+modules      = Matrix.cpp Vector.cpp EigenvalueSolver.cpp Utils.cpp Draw.cpp
+objects      = ${patsubst %.cpp, ${build}/%.o, ${modules}}
+library_file = lib/libpetsc_cpp.a
 
 
-CSOURCE=src/petsc_cpp/HermitianTranspose.c
-CHEADER=include/petsc_cpp/HermitianTranspose.h
-SOURCES=src/petsc_cpp/Matrix.cpp src/petsc_cpp/Vector.cpp src/petsc_cpp/EigenvalueSolver.cpp src/petsc_cpp/Utils.cpp test.cpp src/petsc_cpp/Draw.cpp
-HEADERS=include/petsc_cpp/Matrix.hpp include/petsc_cpp/Vector.hpp include/petsc_cpp/Petsc.hpp include/petsc_cpp/Utils.hpp include/petsc_cpp/EigenvalueSolver.hpp include/petsc_cpp/TimeStepper.hpp
-OBJECTS=$(SOURCES:.cpp=.o)
-COBJECT=$(CSOURCE:.c=.o)
-EXECUTABLE=test
-LIB=lib/libpetsc_cpp.a
-UNAME := $(shell uname)
-ifeq ($(UNAME), Linux)
-	DEFAULT=release
-endif
-ifeq ($(UNAME), Darwin)
-	DEFAULT=debug
-endif
-
-.PHONEY: format cleanup library
-
-debug: format clang library
-	echo "It compiles!  You should commit!"
 
 clang: CXX=clang++
-clang: CPP_FLAGS=${CPP_FLAGS_} ${CLANG_ONLY_FLAGS} ${DEBUG_FLAGS}
-clang: $(OBJECTS) ${EXECUTABLE} library
+clang: CPP_FLAGS += ${clang_cpp_flags} ${debug_cpp_flags}
+clang: library test
 
 gpp: CXX=g++-4.9
-gpp: CPP_FLAGS=${CPP_FLAGS_} ${DEBUG_FLAGS}
-gpp: $(OBJECTS) ${EXECUTABLE} library
+gpp: CPP_FLAGS += ${debug_cpp_flags}
+gpp: library test
 
-release: CPP_FLAGS=${CPP_FLAGS_} ${RELEASE_FLAGS}
-release: $(EXECUTABLE) library
+release: CPP_FLAGS +=${RELEASE_FLAGS}
+release: library
 
-${COBJECT}:
-	mpicc src/petsc_cpp/HermitianTranspose.c -o src/petsc_cpp/HermitianTranspose.o -c -I/Users/spott/Code/libs/petsc-3.5.3/include/ -I${PETSC_DIR}/include/
+test: ${objects} test.cpp
+	mpicxx -o $@ $^ ${LD_FLAGS} ${CPP_FLAGS}
 
-${EXECUTABLE}: ${OBJECTS} ${COBJECT} chkopts
-	${CLINKER} -o ${EXECUTABLE} ${COBJECT} ${OBJECTS} ${LDFLAGS} ${PETSC_VEC_LIB} ${SLEPC_LIB}
+library: ${objects} 
+	@mkdir -p ${dir ${library_file}}
+	ar rus ${library_file} $^
 
-library: ${OBJECTS} ${COBJECT}
-	-mkdir lib/
-	ar rus ${LIB} ${COBJECT} ${OBJECTS}
+${build}/%.o: ${source}/%.cpp
+	@mkdir -p ${dir $@}
+	mpicxx -o $@ -c $< ${CPP_FLAGS}
+
+${source}/%.cpp: ${includes}/%.hpp ${includes}/Petsc.hpp
+	-clang-format -style=file -i $@
+
+${includes}/%.hpp:
+	-clang-format -style=file -i $@ $<
 
 syntax_check: chkopts
-	clang++ -fsyntax-only ${SOURCES} ${CPP_FLAGS_} ${CLANG_ONLY_FLAGS} ${DEBUG_FLAGS} -I${SLEPC_DIR}/include/ -I${PETSC_DIR}/include/
+	clang++ -fsyntax-only ${SOURCES} ${CPP_FLAGS_} ${CLANG_ONLY_FLAGS} ${DEBUG_FLAGS} ${SLEPC_CC_INCLUDES}
 
-format:
-	clang-format -style=file -i ${SOURCES}
-	clang-format -style=file -i ${HEADERS}
+variables:
+	@echo ${objects}
 
-cleanup:
-	${RM} ${OBJECTS}
-	${RM} ${COBJECT}
-	${RM} ${LIB}
+clean:
+	rm -rf ${build}
+	rm -f ${library_file}
+
+.PHONEY: clean library

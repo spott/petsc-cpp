@@ -41,16 +41,9 @@ class Vector
 
 
   public:
-    Vector( const MPI_Comm comm = PETSC_COMM_WORLD )
-        : has_type( false ), assembled( false )
-    {
-        VecCreate( comm, &v_ );
-    }
-
     Vector( size_t size,
             const type t = type::standard,
             MPI_Comm comm = PETSC_COMM_WORLD )
-        : has_type( true ), assembled( false ), vec_type( t )
     {
         if ( t == type::seq ) comm = PETSC_COMM_SELF;
         VecCreate( comm, &v_ );
@@ -58,28 +51,9 @@ class Vector
         VecSetSizes( v_, PETSC_DECIDE, static_cast<int>( size ) );
     }
 
-    Vector( std::unique_ptr<std::vector<std::complex<double>>> input,
-            const type t = type::seq )
-        : data( std::move( input ) ), has_type( true ), assembled( true ),
-          vec_type( t )
-
-    {
-        assert( t != type::standard );
-        if ( t == type::seq )
-            VecCreateSeqWithArray( PETSC_COMM_SELF, 1,
-                                   static_cast<int>( this->data->size() ),
-                                   this->data->data(), &v_ );
-        if ( t == type::mpi )
-            VecCreateMPIWithArray( PETSC_COMM_WORLD, 1,
-                                   static_cast<int>( this->data->size() ),
-                                   PETSC_DECIDE, this->data->data(), &v_ );
-        assemble();
-    }
-
     Vector( const std::complex<double>* input,
             const size_t size,
             const type t = type::seq )
-        : has_type( true ), assembled( true ), vec_type( t )
     {
         assert( t != type::standard );
         if ( t == type::seq )
@@ -89,7 +63,6 @@ class Vector
             VecCreateMPIWithArray( PETSC_COMM_WORLD, 1,
                                    static_cast<int>( size ), PETSC_DECIDE,
                                    input, &v_ );
-        assemble();
     }
 
 
@@ -98,35 +71,35 @@ class Vector
     *************/
     // copy constructor:
     Vector( const Vector& other )
-        : has_type( other.has_type ), vec_type( other.vec_type )
     {
         VecDuplicate( other.v_, &v_ );
         VecCopy( other.v_, v_ );
     }
 
     // move constructor:
-    Vector( Vector&& other )
-        : v_( other.v_ ), data( std::move( other.data ) ),
-          has_type( other.has_type ), assembled( other.assembled ),
-          vec_type( other.vec_type )
+    Vector( Vector&& other ) : v_( other.v_ ) { other.v_ = PETSC_NULL; }
+
+    // this should only be used in the implementation, but might be used if I
+    // forgot a function;
+    enum class owner : char { self, other, bv };
+    Vector( Vec& in, owner o = owner::self ) : v_( in )
     {
-        other.v_ = PETSC_NULL;
+        switch ( o ) {
+            case owner::self:
+                deleter = []( Vec v ) { VecDestroy( &v ); };
+                break;
+            case owner::other:
+                deleter = []( Vec ) {};
+                break;
+            case owner::bv:
+                throw std::invalid_argument(
+                    "bv can't be made with this constructor" );
+        }
     }
 
-    // assume that the vector actually has a type... this should only be
-    // used in
-    // the implementation, but might be used if
-    // I forgot a function;
-    Vector( Vec& in, bool owned_ = true )
-        : v_( in ), assembled( true ), owned( owned_ )
+    Vector( Vec& in, std::function<void( Vec )> deleter_ )
+        : v_( in ), deleter( deleter_ )
     {
-        VecType t;
-        VecGetType( v_, &t );
-        if ( t ) {
-            vec_type = to_type( t );
-            has_type = true;
-        } else
-            has_type = false;
     }
 
     // assignment operator:
@@ -137,7 +110,7 @@ class Vector
     }
 
     // destructor:
-    ~Vector() { VecDestroy( &v_ ); }
+    ~Vector() { deleter( v_ ); }
 
     friend void swap( Vector& first, Vector& second ); // nothrow
 
@@ -147,6 +120,8 @@ class Vector
 
     // set value:
     void set_value( const int n, PetscScalar v );
+
+    Vector& set_all( const PetscScalar v );
 
     // assemble:
     void assemble();
@@ -165,8 +140,11 @@ class Vector
     Vector operator*( const PetscScalar& other ) const;
     Vector operator/( const PetscScalar& other ) const;
     Vector& operator*=( const PetscScalar& other );
+    Vector& operator*=( const Vector& other );
     Vector& operator/=( const PetscScalar& other );
-
+    Vector& axpy(const PetscScalar& alpha, const Vector& x);
+    Vector& operator-=( const Vector& other );
+    Vector& operator+=( const Vector& other );
     /*************
     //getters:
     *************/
@@ -182,6 +160,8 @@ class Vector
     static void draw( const std::vector<Vector>& vectors,
                       const std::vector<double>* v = nullptr );
     void draw( const std::vector<double>* v = nullptr ) const;
+    void draw( std::function<double(double)> f,
+               const std::vector<double>* v = nullptr ) const;
 
     void to_file( const std::string& filename ) const;
 
@@ -194,15 +174,11 @@ class Vector
 
   private:
     // state:
-    std::unique_ptr<std::vector<std::complex<double>>> data;
-    bool has_type;
-    bool assembled;
-    bool owned{true};
-    type vec_type;
-
+    std::function<void( Vec )> deleter{[]( Vec v ) { VecDestroy( &v ); }};
     friend class Matrix;
 };
 
 Vector operator*( const PetscScalar& alpha, Vector b );
 Vector conjugate( Vector v );
+Vector abs_square( Vector v );
 }

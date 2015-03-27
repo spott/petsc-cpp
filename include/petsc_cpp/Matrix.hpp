@@ -32,7 +32,6 @@ class Matrix
         // shell
     };
 
-  private:
     static bool block_type( type t )
     {
         return t == type::block_aij || t == type::seq_block_aij ||
@@ -182,10 +181,16 @@ class Matrix
     // assignment operator:
     Matrix& operator=( const Matrix& other );
     Matrix& operator+=( const Vector& D );
+    Matrix& operator+=( const std::complex<double>& alpha );
     Matrix& operator*=( const std::complex<double>& alpha );
     Matrix& operator/=( const std::complex<double>& alpha );
     Matrix& shallow_copy( const Matrix& a );
+    Vector operator*( const Vector& v ) const;
 
+    void Ax(const Vector& x, Vector& b) const;
+
+    Matrix& diagonal_scale( const Vector& l, const Vector& r );
+    Matrix& diagonal_scale( const Vector& l);
     // destructor:
     ~Matrix()
     {
@@ -243,6 +248,8 @@ class Matrix
         MatMPIAIJSetPreallocation( m_, 0, dnnz.data(), 0, onnz.data() );
     }
 
+    Matrix get_empty_matrix() const;
+
     // assemble!
     void assemble();
 
@@ -264,7 +271,6 @@ class Matrix
 
     double norm( NormType t = NORM_FROBENIUS );
 
-    Vector operator*( const Vector& v ) const;
 
     // print!
     void print() const;
@@ -280,7 +286,7 @@ class Matrix
     bool has_type{false};
     bool assembled{false};
     bool owned{true};
-    type mat_type;
+    type mat_type{type::block_aij};
     friend class Vector;
 };
 

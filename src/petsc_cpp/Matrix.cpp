@@ -11,18 +11,12 @@ Matrix& Matrix::operator=( const Matrix& other )
 {
     assert( other.assembled );
     if ( other.assembled && assembled ) {
-        if ( mat_type == other.mat_type )
-            // assumption here that they have the same nonzero patter... this
-            // could definitely be wrong.
-            MatCopy( other.m_, m_, SAME_NONZERO_PATTERN );
-        else {
-            MatDestroy( &m_ );
-            MatConvert( other.m_, to_MatType( mat_type ), MAT_INITIAL_MATRIX,
-                        &m_ );
-        }
+        // assumption here that they have the same nonzero patter... this
+        // could definitely be wrong.
+        MatCopy( other.m_, m_, SAME_NONZERO_PATTERN );
     } else if ( other.assembled ) {
         MatDestroy( &m_ );
-        MatDuplicate( other.m_, MAT_COPY_VALUES, &m_ );
+        MatConvert( other.m_, to_MatType( mat_type ), MAT_INITIAL_MATRIX, &m_ );
     }
     return *this;
 }
@@ -71,6 +65,13 @@ void Matrix::set_value( const int n, const int m, PetscScalar v )
     assembled = false;
 }
 
+Matrix Matrix::get_empty_matrix() const
+{
+    Mat new_Mat;
+    MatDuplicate( m_, MAT_SHARE_NONZERO_PATTERN, &new_Mat );
+    return Matrix( new_Mat );
+}
+
 // assemble!
 void Matrix::assemble()
 {
@@ -110,7 +111,7 @@ Matrix& Matrix::hermitian_transpose()
 {
     static Mat old_mat = m_;
     if ( old_mat == m_ )
-        MatCreateHTranspose( old_mat, &m_ );
+        MatCreateHermitianTranspose( old_mat, &m_ );
     else {
         MatDestroy( &m_ );
         m_ = old_mat;
@@ -183,11 +184,34 @@ Matrix& Matrix::operator+=( const Vector& D )
     return *this;
 }
 
+Matrix& Matrix::operator+=( const std::complex<double>& alpha )
+{
+    MatShift( m_, alpha );
+    return *this;
+}
+
 Vector Matrix::operator*( const Vector& v ) const
 {
     Vector out = this->get_left_vector();
     MatMult( this->m_, v.v_, out.v_ );
     return out;
+}
+
+void Matrix::Ax( const Vector& x, Vector& b ) const
+{
+    MatMult( this->m_, x.v_, b.v_ );
+}
+
+Matrix& Matrix::diagonal_scale( const Vector& l, const Vector& r )
+{
+    MatDiagonalScale( this->m_, l.v_, r.v_ );
+    return *this;
+}
+
+Matrix& Matrix::diagonal_scale( const Vector& l )
+{
+    MatDiagonalScale( this->m_, l.v_, NULL );
+    return *this;
 }
 
 Matrix& Matrix::shallow_copy( const Matrix& a )

@@ -18,7 +18,7 @@ struct Draw {
         PetscViewerDrawGetDraw( viewer, static_cast<int>( window ), &draw );
         PetscViewerDrawGetDrawLG( viewer, static_cast<int>( window ), &lg );
         PetscDrawSetDoubleBuffer( draw );
-        PetscDrawLGSetDimension( lg, dim );
+        PetscDrawLGSetDimension( lg, static_cast<int>( dim ) );
         PetscDrawLGGetAxis( lg, &axis );
     }
 
@@ -26,9 +26,9 @@ struct Draw {
           double xmax,
           double ymin,
           double ymax,
-          unsigned dim = 2,
+          unsigned dim_ = 2,
           const MPI_Comm comm = PETSC_COMM_WORLD )
-        : Draw( dim, comm )
+        : Draw( dim_, comm )
     {
         set_limits( xmin, xmax, ymin, ymax );
     }

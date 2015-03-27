@@ -11,10 +11,13 @@
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wswitch-enum"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
 #include <petsc.h>
 #ifdef SLEPC
 #include <slepc.h>
 #endif
+#pragma clang diagnostic pop
 #pragma clang diagnostic pop
 #pragma clang diagnostic pop
 #pragma clang diagnostic pop
@@ -32,6 +35,7 @@ class Matrix;
 #include <petsc_cpp/EigenvalueSolver.hpp>
 #endif
 #include <petsc_cpp/TimeStepper.hpp>
+#include <petsc_cpp/Draw.hpp>
 
 
 namespace petsc
