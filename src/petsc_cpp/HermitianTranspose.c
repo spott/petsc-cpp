@@ -1,3 +1,4 @@
+
 #include <petsc-private/matimpl.h>          /*I "petscmat.h" I*/
 
 typedef struct {
@@ -73,20 +74,21 @@ PetscErrorCode MatDuplicate_HTranspose(Mat N, MatDuplicateOption op, Mat* m)
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  //at the moment, this doesn't NOT copy values
-  if (op == MAT_COPY_VALUES)
-    {
-      ierr = MatHermitianTranspose(N, MAT_INITIAL_MATRIX, m); CHKERRQ(ierr);
-    }
-  else
-    SETERRQ(PetscObjectComm((PetscObject)N),PETSC_ERR_ARG_SIZ,"Can't duplicate and not copy values");
+  if (op == MAT_COPY_VALUES) {
+    ierr = MatHermitianTranspose(N,MAT_INITIAL_MATRIX,m);CHKERRQ(ierr);
+  } else if (op == MAT_DO_NOT_COPY_VALUES) {
+    ierr = MatDuplicate(N,MAT_DO_NOT_COPY_VALUES,m);CHKERRQ(ierr);
+    ierr = MatTranspose(*m,MAT_REUSE_MATRIX,m);CHKERRQ(ierr);
+  } else {
+    SETERRQ(PetscObjectComm((PetscObject)N),PETSC_ERR_SUP,"MAT_SHARE_NONZERO_PATTERN not supported for this matrix type");
+  }
   PetscFunctionReturn(0);
 }
 
 #undef __FUNCT__
-#define __FUNCT__ "MatCreateHTranspose"
+#define __FUNCT__ "MatCreateHermitianTranspose"
 /*@
-      MatCreateHTranspose - Creates a new matrix object that behaves like A'*
+      MatCreateHermitianTranspose - Creates a new matrix object that behaves like A'*
 
    Collective on Mat
 
@@ -98,17 +100,17 @@ PetscErrorCode MatDuplicate_HTranspose(Mat N, MatDuplicateOption op, Mat* m)
 
    Level: intermediate
 
-   Notes: The transpose A' is NOT actually formed! Rather the new matrix
+   Notes: The hermitian transpose A' is NOT actually formed! Rather the new matrix
           object performs the matrix-vector product by using the MatMultHermitianTranspose() on
           the original matrix
 
 .seealso: MatCreateNormal(), MatMult(), MatMultHermitianTranspose(), MatCreate()
 
 @*/
-PetscErrorCode  MatCreateHTranspose(Mat A,Mat *N)
+PetscErrorCode  MatCreateHermitianTranspose(Mat A,Mat *N)
 {
-  PetscErrorCode ierr;
-  PetscInt       m,n;
+  PetscErrorCode  ierr;
+  PetscInt        m,n;
   Mat_HTranspose  *Na;
 
   PetscFunctionBegin;
@@ -117,7 +119,6 @@ PetscErrorCode  MatCreateHTranspose(Mat A,Mat *N)
   ierr = MatSetSizes(*N,n,m,PETSC_DECIDE,PETSC_DECIDE);CHKERRQ(ierr);
   ierr = PetscLayoutSetUp((*N)->rmap);CHKERRQ(ierr);
   ierr = PetscLayoutSetUp((*N)->cmap);CHKERRQ(ierr);
-  //hopefully "MATTRANSPOSEMAT" is good enough
   ierr = PetscObjectChangeTypeName((PetscObject)*N,MATTRANSPOSEMAT);CHKERRQ(ierr);
 
   ierr       = PetscNewLog(*N,&Na);CHKERRQ(ierr);
@@ -125,15 +126,13 @@ PetscErrorCode  MatCreateHTranspose(Mat A,Mat *N)
   ierr       = PetscObjectReference((PetscObject)A);CHKERRQ(ierr);
   Na->A      = A;
 
-  (*N)->ops->destroy          = MatDestroy_HTranspose;
-  (*N)->ops->mult             = MatMult_HTranspose;
-  (*N)->ops->multadd          = MatMultAdd_HTranspose;
-  /* (*N)->ops->multtranspose    = MatMultTranspose_HTranspose; */
-  /* (*N)->ops->multtransposeadd = MatMultTransposeAdd_HTranspose; */
-  (*N)->ops->multhermitiantranspose    = MatMultHTranspose_HTranspose;
-  (*N)->ops->multhermitiantransposeadd    = MatMultHTransposeAdd_HTranspose;
-  (*N)->ops->duplicate        = MatDuplicate_HTranspose;
-  (*N)->assembled             = PETSC_TRUE;
+  (*N)->ops->destroy                    = MatDestroy_HTranspose;
+  (*N)->ops->mult                       = MatMult_HTranspose;
+  (*N)->ops->multadd                    = MatMultAdd_HTranspose;
+  (*N)->ops->multhermitiantranspose     = MatMultHTranspose_HTranspose;
+  (*N)->ops->multhermitiantransposeadd  = MatMultHTransposeAdd_HTranspose;
+  (*N)->ops->duplicate                  = MatDuplicate_HTranspose;
+  (*N)->assembled                       = PETSC_TRUE;
 
   ierr = MatSetBlockSizes(*N,PetscAbs(A->cmap->bs),PetscAbs(A->rmap->bs));CHKERRQ(ierr);
   ierr = MatSetUp(*N);CHKERRQ(ierr);

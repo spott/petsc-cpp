@@ -52,34 +52,36 @@ inline void populate_vector( Vector& v_,
         v_.set_value( i, values( i ) );
 }
 
-template <typename T>
-inline void binary_import( T&, const std::string& );
-
-template <>
-inline void binary_import<Matrix>( Matrix& m_, const std::string& filename )
+inline Matrix binary_import_matrix( MPI_Comm comm, Matrix::type mtype, const std::string& filename )
 {
     PetscViewer view;
-    PetscViewerBinaryOpen( m_.comm(), filename.c_str(), FILE_MODE_READ, &view );
-    MatLoad( m_.m_, view );
+    Mat m;
+    MatCreate(comm, &m);
+    MatSetType(m, Matrix::to_MatType(mtype));
+    PetscViewerBinaryOpen( comm, filename.c_str(), FILE_MODE_READ, &view );
+    MatLoad( m, view );
     PetscViewerDestroy( &view );
+    return Matrix(m);
 }
 
-template <>
-inline void binary_import<Vector>( Vector& m_, const std::string& filename )
+inline Vector binary_import_vector( MPI_Comm comm, const std::string& filename )
 {
     PetscViewer view;
-    PetscViewerBinaryOpen( m_.comm(), filename.c_str(), FILE_MODE_READ, &view );
-    VecLoad( m_.v_, view );
+    Vec v;
+    VecCreate(comm, &v);
+    PetscViewerBinaryOpen( comm, filename.c_str(), FILE_MODE_READ, &view );
+    VecLoad( v, view );
     PetscViewerDestroy( &view );
+    return Vector(v);
 }
 
 
 template <typename T>
-inline T& map( const T&, std::function<PetscScalar(PetscScalar, int)>, T& );
+inline T& map( const T&, const std::function<PetscScalar(PetscScalar, int)>&, T& );
 
 template <>
 inline Vector& map<Vector>( const Vector& v_,
-                            std::function<PetscScalar(PetscScalar, int)> f,
+                            const std::function<PetscScalar(PetscScalar, int)>& f,
                             Vector& out )
 {
     int vstart, vend;
@@ -103,11 +105,11 @@ inline Vector& map<Vector>( const Vector& v_,
 }
 
 template <typename T>
-inline T& map( T&, std::function<PetscScalar(PetscScalar, int)> );
+inline T& map( T&, const std::function<PetscScalar(PetscScalar, int)>& );
 
 template <>
 inline Vector& map<Vector>( Vector& v,
-                            std::function<PetscScalar(PetscScalar, int)> f )
+                            const std::function<PetscScalar(PetscScalar, int)>& f )
 {
     int vstart, vend;
     PetscScalar* a;

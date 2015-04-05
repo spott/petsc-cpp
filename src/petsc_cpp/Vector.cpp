@@ -6,7 +6,6 @@ void swap( Vector& first, Vector& second ) // nothrow
 {
     using std::swap;
 
-    swap( first.has_type, second.has_type );
     swap( first.v_, second.v_ );
 }
 
@@ -19,7 +18,11 @@ void swap( Vector& first, Vector& second ) // nothrow
 void Vector::set_value( const int n, PetscScalar v )
 {
     VecSetValue( v_, n, v, INSERT_VALUES );
-    assembled = false;
+}
+Vector& Vector::set_all( const PetscScalar v )
+{
+    VecSet( v_, v );
+    return *this;
 }
 
 // assemble:
@@ -27,7 +30,6 @@ void Vector::assemble()
 {
     VecAssemblyBegin( v_ );
     VecAssemblyEnd( v_ );
-    assembled = true;
 }
 
 Vector& Vector::conjugate()
@@ -102,6 +104,11 @@ Vector& Vector::operator*=( const PetscScalar& other )
     VecScale( v_, other );
     return *this;
 }
+Vector& Vector::operator*=( const Vector& other )
+{
+    VecPointwiseMult( v_, v_, other.v_ );
+    return *this;
+}
 Vector Vector::operator/( const PetscScalar& other ) const
 {
     if ( this->rank() == 0 )
@@ -110,28 +117,35 @@ Vector Vector::operator/( const PetscScalar& other ) const
     VecScale( v.v_, 1. / other );
     return v;
 }
+Vector& Vector::operator+=( const Vector& other )
+{
+    VecAXPY( v_, 1, other.v_ );
+    return *this;
+}
+Vector& Vector::operator-=( const Vector& other )
+{
+    VecAXPY( v_, -1, other.v_ );
+    return *this;
+}
+Vector& Vector::axpy( const PetscScalar& alpha, const Vector& x )
+{
+    VecAXPY( v_, alpha, x.v_ );
+    return *this;
+}
 /*************
 //getters:
 *************/
 int Vector::rank() const
 {
-    static int rank = [=]() {
-        MPI_Comm c;
-        PetscObjectGetComm( (PetscObject)v_, &c );
-        int r;
-        MPI_Comm_rank( c, &r );
-        return r;
-    }();
-    return rank;
+    int r;
+    MPI_Comm_rank( comm(), &r );
+    return r;
 }
 MPI_Comm Vector::comm() const
 {
-    static MPI_Comm comm = [=]() {
-        MPI_Comm c;
-        PetscObjectGetComm( (PetscObject)v_, &c );
-        return c;
-    }();
-    return comm;
+    MPI_Comm c;
+    PetscObjectGetComm( (PetscObject)v_, &c );
+    return c;
 }
 
 size_t Vector::size() const
@@ -175,13 +189,17 @@ void Vector::draw( const std::vector<Vector>& vectors,
         PetscDrawSetDoubleBuffer( draw );
         PetscDrawLGSetDimension( lg, 2 );
         PetscDrawLGReset( lg );
+
+        // max & min
+        PetscReal min, max;
+        VecMax( vectors[i].v_, PETSC_NULL, &max );
+        VecMin( vectors[i].v_, PETSC_NULL, &min );
         if ( v != nullptr )
-            PetscDrawLGSetLimits( lg, v->front(), v->back(), -1, 1 );
+            PetscDrawLGSetLimits( lg, v->front(), v->back(), -min, max );
         else
-            PetscDrawLGSetLimits( lg, 0, vectors[i].size(), -1, 1 );
+            PetscDrawLGSetLimits( lg, 0, vectors[i].size(), -min, max );
         const PetscScalar* array;
         PetscInt start_, end_;
-        // TODO: Need to scatter array first
         VecScatterBegin( scatter, vectors[i].v_, local, INSERT_VALUES,
                          SCATTER_FORWARD );
         VecScatterEnd( scatter, vectors[i].v_, local, INSERT_VALUES,
@@ -198,11 +216,11 @@ void Vector::draw( const std::vector<Vector>& vectors,
                     x[0] = ( *v )[j];
                     x[1] = ( *v )[j];
                 }
-                PetscReal y[2] = {array[j].real(), 10. * array[j].imag()};
+                PetscReal y[2] = {array[j].real(), array[j].imag()};
                 PetscDrawLGAddPoint( lg, x, y );
             }
-            VecRestoreArrayRead( vectors[i].v_, &array );
         }
+        VecRestoreArrayRead( local, &array );
 
         double p;
         PetscDrawGetPause( draw, &p );
@@ -210,6 +228,7 @@ void Vector::draw( const std::vector<Vector>& vectors,
         PetscDrawLGDraw( lg );
         PetscDrawSetPause( draw, p );
     }
+    VecDestroy( &local );
 }
 
 void Vector::draw( const std::vector<double>* v ) const
@@ -217,6 +236,9 @@ void Vector::draw( const std::vector<double>* v ) const
     static PetscViewer viewer = PETSC_VIEWER_DRAW_( this->comm() );
     PetscDraw draw;
     PetscDrawLG lg;
+    VecScatter scatter;
+    Vec local;
+    VecScatterCreateToZero( v_, &scatter, &local );
 
     PetscViewerDrawGetDraw( viewer, 0, &draw );
     PetscViewerDrawGetDrawLG( viewer, 0, &lg );
@@ -224,31 +246,99 @@ void Vector::draw( const std::vector<double>* v ) const
     PetscDrawSetDoubleBuffer( draw );
     PetscDrawLGSetDimension( lg, 2 );
     PetscDrawLGReset( lg );
-    if ( v != nullptr )
-        PetscDrawLGSetLimits( lg, v->front(), v->back(), -1, 1 );
-    else
-        PetscDrawLGSetLimits( lg, 0, this->size(), -1, 1 );
+    PetscReal min, max;
+    VecMax( v_, PETSC_NULL, &max );
+    VecMin( v_, PETSC_NULL, &min );
+    if ( v != nullptr ) {
+        PetscDrawLGSetLimits( lg, v->front(), v->back(), -min, max );
+        assert( v->size() >= size() );
+    } else
+        PetscDrawLGSetLimits( lg, 0, this->size(), -min, max );
+
+    const PetscScalar* array;
+    PetscInt start_, end_;
+    VecScatterBegin( scatter, v_, local, INSERT_VALUES, SCATTER_FORWARD );
+    VecScatterEnd( scatter, v_, local, INSERT_VALUES, SCATTER_FORWARD );
+    if ( !rank() ) {
+        VecGetArrayRead( local, &array );
+        VecGetOwnershipRange( local, &start_, &end_ );
+        size_t start = static_cast<size_t>( start_ );
+        size_t end = static_cast<size_t>( end_ );
+        // this is a local vector, and thus should span the vector:
+        assert( start == 0 );
+        assert( end == size() );
+        if ( v != nullptr ) end = v->size();
+
+        for ( auto i = 0u; i < end - start; ++i ) {
+            PetscReal x[2] = {double( i + start ), double( i + start )};
+            if ( v != nullptr ) {
+                x[0] = ( *v )[i];
+                x[1] = ( *v )[i];
+            }
+            PetscReal y[2] = {array[i].real(), array[i].imag()};
+            PetscDrawLGAddPoint( lg, x, y );
+        }
+        VecRestoreArrayRead( local, &array );
+        VecDestroy( &local );
+    }
+    PetscDrawLGDraw( lg );
+}
+
+void Vector::draw( std::function<double(double)> f,
+                   const std::vector<double>* v ) const
+{
+    static PetscViewer viewer = PETSC_VIEWER_DRAW_( this->comm() );
+    PetscDraw draw;
+    PetscDrawLG lg;
+    VecScatter scatter;
+    Vec local;
+    VecScatterCreateToZero( v_, &scatter, &local );
+
+    PetscViewerDrawGetDraw( viewer, 0, &draw );
+    PetscViewerDrawGetDrawLG( viewer, 0, &lg );
+    PetscDrawSetTitle( draw, "Vector" );
+    PetscDrawSetDoubleBuffer( draw );
+    PetscDrawLGSetDimension( lg, 2 );
+    PetscDrawLGReset( lg );
+    PetscReal min, max;
+    VecMax( v_, PETSC_NULL, &max );
+    VecMin( v_, PETSC_NULL, &min );
+    if ( v != nullptr ) {
+        PetscDrawLGSetLimits( lg, v->front(), v->back(), f( min ), f( max ) );
+        assert( v->size() >= size() );
+    } else
+        PetscDrawLGSetLimits( lg, 0, this->size(), f( min ), f( max ) );
 
     const PetscScalar* array;
     PetscInt start_, end_;
     // TODO: Need to scatter array first
-    VecGetArrayRead( v_, &array );
-    VecGetOwnershipRange( v_, &start_, &end_ );
-    size_t start = static_cast<size_t>( start_ );
-    size_t end = static_cast<size_t>( end_ );
+    VecScatterBegin( scatter, v_, local, INSERT_VALUES, SCATTER_FORWARD );
+    VecScatterEnd( scatter, v_, local, INSERT_VALUES, SCATTER_FORWARD );
+    if ( !rank() ) {
+        VecGetArrayRead( local, &array );
+        VecGetOwnershipRange( local, &start_, &end_ );
+        size_t start = static_cast<size_t>( start_ );
+        size_t end = static_cast<size_t>( end_ );
+        // this is a local vector, and thus should span the vector:
+        assert( start == 0 );
+        assert( end == size() );
+        if ( v != nullptr ) end = v->size();
 
-    for ( auto i = 0u; i < end - start; ++i ) {
-        PetscReal x[2] = {double( i + start ), double( i + start )};
-        if ( v != nullptr ) {
-            x[0] = ( *v )[i];
-            x[1] = ( *v )[i];
+        for ( auto i = 0u; i < end - start; ++i ) {
+            PetscReal x[2] = {double( i + start ), double( i + start )};
+            if ( v != nullptr ) {
+                x[0] = ( *v )[i];
+                x[1] = ( *v )[i];
+            }
+            PetscReal y[2] = {f( array[i].real() ), f( array[i].imag() )};
+            PetscDrawLGAddPoint( lg, x, y );
         }
-        PetscReal y[2] = {array[i].real(), array[i].imag()};
-        PetscDrawLGAddPoint( lg, x, y );
+        VecRestoreArrayRead( local, &array );
+        VecDestroy( &local );
     }
-    VecRestoreArrayRead( v_, &array );
     PetscDrawLGDraw( lg );
 }
+
 
 void Vector::to_file( const std::string& filename ) const
 {
@@ -271,6 +361,13 @@ Vector operator*( const PetscScalar& alpha, Vector b )
 Vector conjugate( Vector v )
 {
     VecConjugate( v.v_ );
+    return v;
+}
+
+Vector abs_square( Vector v )
+{
+    VecAbs( v.v_ );
+    VecPow( v.v_, 2 );
     return v;
 }
 }
