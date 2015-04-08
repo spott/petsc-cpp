@@ -1,7 +1,7 @@
 petsc-cpp
 =========
 
-C++ Interface to PETSc
+C++ Interface to PETSc and SLEPc.  Currently requires PETSc and SLEPc from master:  bitbucket.org/petsc/petsc and bitbucket.or/slepc/slepc
 
 Currently limited to only a few different classes:
 
