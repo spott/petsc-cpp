@@ -164,6 +164,7 @@ class Vector
                const std::vector<double>* v = nullptr ) const;
 
     void to_file( const std::string& filename ) const;
+    std::vector<std::complex<double>> to_vector() const;
 
 
     // this is public incase people want to use methods that aren't defined

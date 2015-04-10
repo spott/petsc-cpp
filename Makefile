@@ -1,7 +1,7 @@
 include ${SLEPC_DIR}/lib/slepc-conf/slepc_variables
 
 
-release_cpp_flags = -Wall -Wpedantic -Wextra
+release_cpp_flags = -Wall -Wpedantic -Wextra -fdiagnostics-color=auto
 clang_cpp_flags   = -fdiagnostics-show-template-tree -Wbind-to-temporary-copy -Weverything -D_DEBUG
 debug_cpp_flags   = ${release_cpp_flags} -Werror -Wno-c++98-compat-pedantic \
 					          -Wno-old-style-cast -Wno-padded -Wno-deprecated-declarations

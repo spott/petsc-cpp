@@ -47,6 +47,8 @@ struct Draw {
 
     void draw_vector( const std::vector<Vector>& v );
 
+    void draw_vector( const std::vector<std::complex<double>>& v );
+
     void set_grid( std::vector<double> v );
 
     void set_function( std::function<PetscReal(PetscScalar, unsigned)> func );

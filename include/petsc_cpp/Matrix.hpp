@@ -100,12 +100,12 @@ class Matrix
 
   public:
     // constructors:
-    Matrix( const MPI_Comm comm = PETSC_COMM_WORLD ) : has_type( false )
+    explicit Matrix( const MPI_Comm comm = PETSC_COMM_WORLD ) : has_type( false )
     {
         MatCreate( comm, &m_ );
     }
 
-    Matrix( const type t /*= MATMPIAIJ*/,
+    explicit Matrix( const type t /*= MATMPIAIJ*/,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : mat_type( t )
     {
@@ -115,7 +115,7 @@ class Matrix
     }
 
     // non-square:
-    Matrix( size_t N,
+    explicit Matrix( size_t N,
             size_t M,
             const type t = type::aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )

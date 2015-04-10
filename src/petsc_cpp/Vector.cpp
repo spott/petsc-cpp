@@ -349,6 +349,29 @@ void Vector::to_file( const std::string& filename ) const
     PetscViewerDestroy( &view );
 }
 
+std::vector<std::complex<double>> Vector::to_vector() const
+{
+    VecScatter scatter;
+    Vec local;
+    const PetscScalar* array;
+    PetscInt start_, end_;
+
+    std::vector<std::complex<double>> out;
+    VecScatterCreateToZero( v_, &scatter, &local );
+    VecScatterBegin( scatter, v_, local, INSERT_VALUES, SCATTER_FORWARD );
+    VecScatterEnd( scatter, v_, local, INSERT_VALUES, SCATTER_FORWARD );
+    VecGetArrayRead( local, &array );
+    VecGetOwnershipRange( local, &start_, &end_ );
+
+    for ( auto a = 0u; a < static_cast<unsigned>( end_ - start_ ); a++ ) {
+        out.push_back( array[a] );
+    }
+
+    VecRestoreArrayRead( local, &array );
+    VecDestroy( &local );
+
+    return out;
+}
 
 Vector operator*( const PetscScalar& alpha, Vector b )
 {

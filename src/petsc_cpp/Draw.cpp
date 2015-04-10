@@ -81,8 +81,8 @@ void Draw::draw_vector( const Vector& v )
             }
             PetscReal y[2] = {array[i].real(), array[i].imag()};
             if ( f ) {
-                y[0] = ( *f )( array[i].real(), i );
-                y[1] = ( *f )( array[i].imag(), i );
+                y[0] = ( *f )( array[i], i );
+                y[1] = ( *f )( array[i], i );
             }
             PetscDrawLGAddPoint( lg, x, y );
         }
@@ -91,6 +91,31 @@ void Draw::draw_vector( const Vector& v )
     }
     PetscDrawLGDraw( lg );
 }
+
+void Draw::draw_vector( const std::vector<std::complex<double>>& v )
+{
+    this->reset();
+    if ( !rank() ) {
+        unsigned i = 0;
+        for ( auto&& a : v ) {
+            PetscReal y[2] = {a.real(), a.imag()};
+            PetscReal x[2] = {static_cast<double>(i), static_cast<double>(i)};
+            if ( f ) {
+                y[0] = ( *f )( y[0], i );
+                y[1] = ( *f )( y[1], i );
+            }
+            if ( grid.size() > i ) {
+                x[0] = grid[i];
+                x[1] = grid[i];
+            }
+            PetscDrawLGAddPoint(lg, x, y);
+            i++;
+        }
+    }
+    PetscDrawLGDraw(lg);
+}
+
+
 void Draw::draw_vector( const std::vector<Vector>& v )
 {
     assert( dim % 2 == 0 );
@@ -133,8 +158,8 @@ void Draw::draw_vector( const std::vector<Vector>& v )
                 xarray[j * 2] = x;
                 xarray[j * 2 + 1] = x;
                 if ( f ) {
-                    yarray[j * 2] = ( *f )( array[j][i].real(), i );
-                    yarray[j * 2 + 1] = ( *f )( array[j][i].imag(), i );
+                    yarray[j * 2] = ( *f )( array[j][i], i );
+                    yarray[j * 2 + 1] = ( *f )( array[j][i], i );
                 } else {
                     yarray[j * 2] = array[j][i].real();
                     yarray[j * 2 + 1] = array[j][i].imag();

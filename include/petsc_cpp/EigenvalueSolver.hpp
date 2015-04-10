@@ -34,7 +34,8 @@ class EigenvalueSolver
         all = EPS_ALL,
         user = EPS_WHICH_USER
     };
-    // EigenvalueSolver(Type type, MPI_Comm comm = PETSC_COMM_WORLD) : problem_type(type) {
+    // EigenvalueSolver(Type type, MPI_Comm comm = PETSC_COMM_WORLD) :
+    // problem_type(type) {
     //     EPSCreate( comm, &e_ );
     //     EPSSetProblemType( e_, static_cast<EPSProblemType>( type ) );
     // }
@@ -86,7 +87,7 @@ class EigenvalueSolver
         delete; // we don't need no stinkin copy constructor...
 
     EigenvalueSolver( EigenvalueSolver&& other )
-        : e_( other.e_ ),  problem_type( other.problem_type ),
+        : e_( other.e_ ), problem_type( other.problem_type ),
           which( other.which )
     {
         inner_product_space_mat = std::move( other.inner_product_space_mat );
@@ -116,6 +117,28 @@ class EigenvalueSolver
     void set_deflation_space( std::vector<Vector> init );
     void balance( EPSBalance bal, int iter, double cuttoff = PETSC_DECIDE );
     void shift_invert( std::complex<double> sigma );
+
+    template <typename Sel>
+    void set_eigenvector_selection( Sel& S )
+    {
+        static Sel S_ = S;
+        EPSSetArbitrarySelection(
+            e_, EigenvalueSolver::arb_selection_function<Sel>, S_ );
+    }
+
+    template <typename Sel>
+    static PetscErrorCode arb_selection_function( PetscScalar er,
+                                                  PetscScalar ei,
+                                                  Vec xr,
+                                                  Vec xi,
+                                                  PetscScalar* rr,
+                                                  PetscScalar* ri,
+                                                  void* S )
+    {
+        Vector X( xr, Vector::owner::other );
+        *rr = (*(Sel*))S( X, er );
+        return 0;
+    }
 
     void dimensions( int nev, int mpd = -1, int ncv = -1 );
 
