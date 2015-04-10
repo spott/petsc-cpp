@@ -136,7 +136,7 @@ class EigenvalueSolver
                                                   void* S )
     {
         Vector X( xr, Vector::owner::other );
-        *rr = (*(Sel*))S( X, er );
+        *rr = (*(Sel*)S)( X, er );
         return 0;
     }
 
