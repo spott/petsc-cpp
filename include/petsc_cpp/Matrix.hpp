@@ -129,7 +129,7 @@ class Matrix
     }
 
     // square:
-    Matrix( size_t N,
+    Matrix( unsigned N,
             const type t = type::aij,
             const MPI_Comm comm = PETSC_COMM_WORLD )
         : Matrix( N, N, t, comm )
